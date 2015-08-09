@@ -42,11 +42,15 @@ public class MasterNode {
   static HashSet<String> dataNodesAddresses;
   
   static NameNodeInterface nameNode = null;
+  static RemoteFileInterface remoteFile = null;
   static DataNodeInterface[] dataNodes = null;
   
   static String workerNodesFileName;
   static HashSet<String> workerNodesAddresses = new HashSet<String>();;
   static WorkerNodeInterface[] workerNodes = null;
+  
+  static String nameNodeHost;
+  static int nameNodePort;
   
   public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException {
 
@@ -58,7 +62,7 @@ public class MasterNode {
         initLogger(0, null); // 1 - logLevel, 2 - logFilename
       }
       
-      if (args.length < 3) {
+      if (args.length < 4) {
         throw new IncompleteArgumentListException();
       }
     
@@ -67,11 +71,16 @@ public class MasterNode {
         System.setSecurityManager(new SecurityManager());
       }
   
-      //Registry registry = LocateRegistry.getRegistry(args[1]);
-      //NameNodeInterface nameNode = (NameNodeInterface) registry.lookup("NameNode");
+      nameNodeHost = args[1];
+      nameNodePort = Integer.parseInt(args[3]);
+      log(0, "Name node port is: " + nameNodePort + "\n");
       
-      nameNode = (NameNodeInterface) Naming.lookup("NameNode");
-      RemoteFileInterface remoteFile = (RemoteFileInterface) Naming.lookup("RemoteFile");
+      Registry registry = LocateRegistry.getRegistry(nameNodeHost, nameNodePort);
+      nameNode = (NameNodeInterface) registry.lookup("NameNode");
+      remoteFile = (RemoteFileInterface) registry.lookup("RemoteFile");
+      
+      //nameNode = (NameNodeInterface) Naming.lookup("NameNode");
+      //remoteFile = (RemoteFileInterface) Naming.lookup("RemoteFile");
       //DataNodeInterface dataNode = (DataNodeInterface) Naming.lookup("DataNode");
       
       dataNodesAddresses = nameNode.getDataNodesAddresses();
@@ -265,6 +274,25 @@ public class MasterNode {
             } else {
               log(0, "Init was not performed\n");
             }
+        } else if (msg.equals("mapreduce")) {
+          // run mapreduce tasks on available workers
+          if (splitArray.length < 7 || splitArray.length > 7) {
+            log(0, "Use: mapreduce <job name> <mappers count> <reducers count> <jar with task> <class name> <data directory> <output file>\n");
+          } else {
+            String jobName = splitArray[0];
+            int mCount = Integer.parseInt(splitArray[1]);
+            int rCount = Integer.parseInt(splitArray[2]);
+            String pathToJar = normalizePath(splitArray[3]);
+            String className = splitArray[4];
+            String pathToData = normalizePath(splitArray[5]);
+            String pathToResult = normalizePath(splitArray[6]);
+            
+            boolean taskNotFinished = true;
+            
+            while (taskNotFinished) {
+              
+            }
+          }
         } else if (msg.equals("")) {
           // just do nothing
           

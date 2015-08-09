@@ -1,0 +1,48 @@
+Innopolis University Distributed Systems Summer 2015
+Individual Assignment#4:
+Urysov and Kovtunenko Distributed File System Due: Fri Jul 7, 2015
+Project description
+This project asks you to implement Distributed File System and simple interactive interface. You can choose any type of architecture for your implementation; however, you can get extra points for implementing of some particular type (see additional requirements).
+Implementation of this assignment might be used in your group project (Implementation of MapReduce framework). Thus, it would be better to read about specific requirements for file systems which are used for this framework (for example HDFS, Google File System, etc.)
+DSS Taxonomy
+Your implementation should fit into taxonomy of distributed storages, which was discussed on the lecture and in the “A Taxonomy of Distributed Storage Systems” article.
+Taxonomy index
+? System Function
+? Storage Architecture
+? Operating Environment
+? Usage Patterns
+? Consistency (can be skipped in the implementation)
+? Security (can be skipped in the implementation)
+? Autonomic Management (can be skipped in the implementation)
+? Federation (can be skipped in the implementation)
+? Routing and Network Overlays
+Implementation requirements
+? DFS should support flat files and directory service
+? The interface between DFS nodes is left for you to design
+? As a basic model you can choose Globally centralized architecture
+Additional requirements (extra points will be assigned for implementation any of them):
+? Locally centralized architecture
+? P2P architecture
+? Splitting files into chunks
+? Replication of data
+? File caching at the client
+? The system should be robust. It should be able to continue operation even if one of the participant nodes crashes, and it should be able to recover the state of a node following a crash so that it can resume operation.
+DFS client
+? Responsible for making the distributed nature of the system transparent to the user
+? File interface should include next functions
+o Initialize. Initialize the client storage on a new system, should remove any existed file in the root directory and return available size.
+o File read. Should allow to read any file from DFS.
+o File write. Should allow to put any file to DFS
+o File delete. Should allow to delete any file from DFS
+Innopolis University Distributed Systems Summer 2015
+Individual Assignment#4:
+Urysov and Kovtunenko Distributed File System Due: Fri Jul 7, 2015
+o File info. Should provide information about the file (any useful information - size, node id, etc.)
+o Open directory. Should allow to change directory
+o Read directory. Should return list of files, which are stored in the directory.
+o Make directory. Should allow to make a directory.
+o Delete directory. Should allow to delete directory. In case if the directory contains files the system should ask confirmation from the user before deletion.
+? Each client should write the log file
+Deliverables
+? Source code
+? Short report with explanation of the DFS you designed, with explanation of how it fits to the described taxonomy, assumptions you made and other important aspects of implementation.
