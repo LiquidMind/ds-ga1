@@ -3,6 +3,9 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -17,7 +20,7 @@ import java.util.Scanner;
 import java.util.regex.Pattern;
 
 
-public class Client {
+public class MasterNode {
   //flag to notify that client should keep working
   static boolean keepWorking = true;
   
@@ -39,188 +42,21 @@ public class Client {
   static NameNodeInterface nameNode = null;
   static DataNodeInterface[] dataNodes = null;
   
-  static String normalizePath(String path) {
-    if (path.startsWith("\\")) {
-      return path;
-    } else {
-      return currentFolder + "\\" + path;
-    }
-  }
+  static String workerNodesFileName;
   
-  static void makeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException {
-    RemoteFileInterface folder = nameNode.getFile(path);
-    if (folder.exists()) {
-      log(0, "Name \"" + folder.remoteToString() + "\" already exists\n");
-    } else {
-      // create directory
-      if (folder.mkdir()) {
-        log(0, "Directory \"" + folder.remoteToString() + "\" has being created\n");
-      } else {
-        log(0, "Directory \"" + folder.remoteToString() + "\" can't be created\n");
-      }
-    }
-  }
+  static HashSet<String> workerNodesAddresses;
   
-  static void removeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
-    RemoteFileInterface folder = nameNode.getFile(path);
-    
-    if (folder.getVirtualPath().equals("\\")) {
-      log(0, "You can't remove root of the DFS.\n");
-      log(0, "To clear everything use: init\n");
-    } else if (!folder.exists()) {
-      log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
-    } else if (!folder.isDirectory()) {
-      log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
-    } else {
-      switch (folder.isEmpty()) {
-        case -1:
-          // this is not possible, because we've filtered it earlier
-          log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
-          break;
-        case 0:
-          // directory is not empty, ask about recursive delete
-          log(0, "Directory \"" + folder.remoteToString() + "\" is not empty. Delete recursively?\n");
-          System.out.print(Logger.dateFormatter.format(System.currentTimeMillis()) + " >> Yes or No >> ");
-          if (userInput.hasNextLine()) {
-            message = userInput.nextLine();
-          } else {
-            message = "n";
-          }
-          if (message.trim().toLowerCase().equals("y") || message.trim().toLowerCase().equals("yes")) {
-            if (folder.delete(true)) {
-              log(0, "Directory \"" + folder.remoteToString() + "\" and its content was removed\n");
-            } else {
-              log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
-            }
-          } else {
-            log(0, "Directory \"" + folder.remoteToString() + "\" was not deleted\n");
-          }
-          break;
-        case 1:
-          if (folder.delete(false)) {
-            log(0, "Directory \"" + folder.remoteToString() + "\" was removed\n");
-          } else {
-            log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
-          }
-          break;
-      }
-    }
-  }
-  
-  static void deleteFile(String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
-    RemoteFileInterface file = nameNode.getFile(path);
-    if (!file.exists()) {
-      log(0, "File \"" + file.remoteToString() + "\" doesn't exist\n");
-    } else if (!file.isFile()) {
-      log(0, "\"" + file.remoteToString() + "\" is not a file\n");
-    } else {
-      if (file.delete(true)) {
-        log(0, "File \"" + file.remoteToString() + "\" was deleted\n");
-      } else {
-        log(0, "File \"" + file.remoteToString() + "\" can't be deleted\n");
-      }
-    }
-  }
-  
-  static void uploadFile(String local, String remote) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
-    RemoteFileInterface remoteFI = nameNode.getFile(remote);
-    
-    boolean error = false;
-    if (remoteFI.exists()) {
-      log(0, "Name \"" + remoteFI.remoteToString() + "\" is already used\n");
-      error = true;
-    } 
-    File localF = new File(local);
-    if (!localF.exists()) {
-      log(0, "File \"" + localF + "\" doesn't exist\n");
-      error = true;
-    }
-    if (!localF.isFile()) {
-      log(0, "\"" + localF + "\" is not a file\n");
-      error = true;
-    }
-    
-    byte[] buffer = new byte[65536];
-    byte[] chunk = null;
-    List<int[]> chunks = new ArrayList<int[]>(); 
-    int hash;
-    int dataNodeId;
-    int chunkLength;
-    if (!error) {
-      FileInputStream fis = new FileInputStream(localF);
-      for (int i = 0; (chunkLength = fis.read(buffer)) != -1; i++) {
-        log(0, "chunkLength: " + chunkLength + ", buffer.length: " + buffer.length + "\n");
-        chunk = Arrays.copyOfRange(buffer, 0, chunkLength);
-        hash = Arrays.hashCode(chunk);
-        // trick that not to get negative values here
-        dataNodeId = (hash % nameNode.numberOfDataNodes() + nameNode.numberOfDataNodes()) % nameNode.numberOfDataNodes();
-        if (dataNodes[dataNodeId].saveChunk(chunk)) {
-          int[] chunkData = {hash, dataNodeId};
-          chunks.add(chunkData);
-        } else {
-          log(0, "Can't save chunk " + hash + " at node " + (dataNodeId + 1));
-        }
-      }
-      fis.close();
-      
-      // save chunk list to name node
-      remoteFI.saveChunksList(chunks);
-      log(0, "File was uploaded from \"" + localF.getCanonicalPath() + "\" to " + remoteFI.remoteToString() + "\n");
-    }
-  }
-  
-  static void downloadFile (String remote, String local) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
-    RemoteFileInterface remoteFI = nameNode.getFile(remote);
-    
-    File localF = new File(local);
-    
-    boolean error = false;
-    if (localF.exists()) {
-      log(0, "Name \"" + localF.getCanonicalPath() + "\" is already used\n");
-      error = true;
-    } 
-    
-    if (!remoteFI.exists()) {
-      log(0, "File \"" + remoteFI.remoteToString() + "\" doesn't exist\n");
-      error = true;
-    }
-    if (!remoteFI.isFile()) {
-      log(0, "\"" + remoteFI.remoteToString() + "\" is not a file\n");
-      error = true;
-    }
-    
-    byte[] buffer = null;
-    List<int[]> chunks = remoteFI.getChunksList(); 
-    
-    if (!error) {
-      FileOutputStream fos = new FileOutputStream(localF);
-      
-      for (int[] chunk : chunks) {
-        buffer = dataNodes[chunk[1]].getChunk(chunk[0]);
-        if (buffer != null) {
-          log(0, "buffer.length: " + buffer.length + "\n");
-        } else {
-          log(0, "Can't read chunk " + chunk[0] + " from node " + chunk[1]);
-        }
-        fos.write(buffer);
-      }
-      fos.close();
-      
-      log(0, "File was saved from \"" + remoteFI.remoteToString() + "\" to " + localF.getCanonicalPath() + "\n");
-    }
-  }
-   
   public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException {
 
     try {
       // init everything to log messages
-      if (args.length > 2) {
+      if (args.length > 1) {
         initLogger(0, args[0]); // 1 - logLevel, 2 - logFilename
       } else {
         initLogger(0, null); // 1 - logLevel, 2 - logFilename
       }
       
-      if (args.length < 2) {
+      if (args.length < 3) {
         throw new IncompleteArgumentListException();
       }
     
@@ -243,6 +79,36 @@ public class Client {
         String[] parts = s.split(":");
         log(0, "ID: " + parts[0] + ", host: " + parts[1] + ", port: " + parts[2] + "\n");
         dataNodes[Integer.parseInt(parts[0]) - 1] = (DataNodeInterface) Naming.lookup("//" + parts[1] + ":" + parts[2] + "/DataNode"); // "//host:port/name"
+      }
+      
+      // name of the file with the list of expected worker nodes from the program parameters
+      workerNodesFileName = args[2];
+      
+      // check if file exists
+      File f = new File(workerNodesFileName);
+      if(!f.exists() || f.isDirectory()) {
+        throw new IncorrectWorkerNodesFileNameFileException();
+      }
+      
+      // read list of of expected data nodes to connect to
+      log(0, "WorkerNodes' addresses to connect to are:\n");
+  
+      List<String> lines = Files.readAllLines(Paths.get(workerNodesFileName), Charset.defaultCharset());
+      for (String line : lines) {
+        log(0, line + "\n");
+        dataNodesAddresses.add(line.trim());
+      }
+      if (dataNodesAddresses.isEmpty()) {
+        throw new EmptyWorkerNodesFileException();
+      }
+      
+      workerNodesAddresses = nameNode.getDataNodesAddresses();
+      log(0, "There are " + workerNodesAddresses.size() + " worker nodes:\n");
+      //workerNodes = new WorkerNodeInterface[workerNodesAddresses.size()];
+      for (String s : dataNodesAddresses) {
+        String[] parts = s.split(":");
+        log(0, "ID: " + parts[0] + ", host: " + parts[1] + ", port: " + parts[2] + "\n");
+      //  workerNodes[Integer.parseInt(parts[0]) - 1] = (WorkerNodeInterface) Naming.lookup("//" + parts[1] + ":" + parts[2] + "/WorkerNode"); // "//host:port/name"
       }
       
       userInput  = new Scanner(System.in);
@@ -435,7 +301,11 @@ public class Client {
     } catch (MalformedURLException e) {
       log(0, "Malformed URI was used to lookup RMI object.");
       e.printStackTrace();
-    }      
+    } catch (IncorrectWorkerNodesFileNameFileException e) {
+      log(0, "File with list of worker nodes doesn't exist or inaccessible.");
+    } catch (EmptyWorkerNodesFileException e) {
+      log(0, "File with list of worker nodes is empty.");
+    }       
   }
   
   public static void initLogger(int logLevel, String logFilename) throws IncorrectLogFileException {
@@ -447,5 +317,176 @@ public class Client {
       throw new UninitializedLoggerException();
     }
     logger.log(logLevel, message);
+  }
+  
+  static String normalizePath(String path) {
+    if (path.startsWith("\\")) {
+      return path;
+    } else {
+      return currentFolder + "\\" + path;
+    }
+  }
+  
+  static void makeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException {
+    RemoteFileInterface folder = nameNode.getFile(path);
+    if (folder.exists()) {
+      log(0, "Name \"" + folder.remoteToString() + "\" already exists\n");
+    } else {
+      // create directory
+      if (folder.mkdir()) {
+        log(0, "Directory \"" + folder.remoteToString() + "\" has being created\n");
+      } else {
+        log(0, "Directory \"" + folder.remoteToString() + "\" can't be created\n");
+      }
+    }
+  }
+  
+  static void removeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface folder = nameNode.getFile(path);
+    
+    if (folder.getVirtualPath().equals("\\")) {
+      log(0, "You can't remove root of the DFS.\n");
+      log(0, "To clear everything use: init\n");
+    } else if (!folder.exists()) {
+      log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
+    } else if (!folder.isDirectory()) {
+      log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
+    } else {
+      switch (folder.isEmpty()) {
+        case -1:
+          // this is not possible, because we've filtered it earlier
+          log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
+          break;
+        case 0:
+          // directory is not empty, ask about recursive delete
+          log(0, "Directory \"" + folder.remoteToString() + "\" is not empty. Delete recursively?\n");
+          System.out.print(Logger.dateFormatter.format(System.currentTimeMillis()) + " >> Yes or No >> ");
+          if (userInput.hasNextLine()) {
+            message = userInput.nextLine();
+          } else {
+            message = "n";
+          }
+          if (message.trim().toLowerCase().equals("y") || message.trim().toLowerCase().equals("yes")) {
+            if (folder.delete(true)) {
+              log(0, "Directory \"" + folder.remoteToString() + "\" and its content was removed\n");
+            } else {
+              log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
+            }
+          } else {
+            log(0, "Directory \"" + folder.remoteToString() + "\" was not deleted\n");
+          }
+          break;
+        case 1:
+          if (folder.delete(false)) {
+            log(0, "Directory \"" + folder.remoteToString() + "\" was removed\n");
+          } else {
+            log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
+          }
+          break;
+      }
+    }
+  }
+  
+  static void deleteFile(String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface file = nameNode.getFile(path);
+    if (!file.exists()) {
+      log(0, "File \"" + file.remoteToString() + "\" doesn't exist\n");
+    } else if (!file.isFile()) {
+      log(0, "\"" + file.remoteToString() + "\" is not a file\n");
+    } else {
+      if (file.delete(true)) {
+        log(0, "File \"" + file.remoteToString() + "\" was deleted\n");
+      } else {
+        log(0, "File \"" + file.remoteToString() + "\" can't be deleted\n");
+      }
+    }
+  }
+  
+  static void uploadFile(String local, String remote) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface remoteFI = nameNode.getFile(remote);
+    
+    boolean error = false;
+    if (remoteFI.exists()) {
+      log(0, "Name \"" + remoteFI.remoteToString() + "\" is already used\n");
+      error = true;
+    } 
+    File localF = new File(local);
+    if (!localF.exists()) {
+      log(0, "File \"" + localF + "\" doesn't exist\n");
+      error = true;
+    }
+    if (!localF.isFile()) {
+      log(0, "\"" + localF + "\" is not a file\n");
+      error = true;
+    }
+    
+    byte[] buffer = new byte[65536];
+    byte[] chunk = null;
+    List<int[]> chunks = new ArrayList<int[]>(); 
+    int hash;
+    int dataNodeId;
+    int chunkLength;
+    if (!error) {
+      FileInputStream fis = new FileInputStream(localF);
+      for (int i = 0; (chunkLength = fis.read(buffer)) != -1; i++) {
+        log(0, "chunkLength: " + chunkLength + ", buffer.length: " + buffer.length + "\n");
+        chunk = Arrays.copyOfRange(buffer, 0, chunkLength);
+        hash = Arrays.hashCode(chunk);
+        // trick that not to get negative values here
+        dataNodeId = (hash % nameNode.numberOfDataNodes() + nameNode.numberOfDataNodes()) % nameNode.numberOfDataNodes();
+        if (dataNodes[dataNodeId].saveChunk(chunk)) {
+          int[] chunkData = {hash, dataNodeId};
+          chunks.add(chunkData);
+        } else {
+          log(0, "Can't save chunk " + hash + " at node " + (dataNodeId + 1));
+        }
+      }
+      fis.close();
+      
+      // save chunk list to name node
+      remoteFI.saveChunksList(chunks);
+      log(0, "File was uploaded from \"" + localF.getCanonicalPath() + "\" to " + remoteFI.remoteToString() + "\n");
+    }
+  }
+  
+  static void downloadFile (String remote, String local) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface remoteFI = nameNode.getFile(remote);
+    
+    File localF = new File(local);
+    
+    boolean error = false;
+    if (localF.exists()) {
+      log(0, "Name \"" + localF.getCanonicalPath() + "\" is already used\n");
+      error = true;
+    } 
+    
+    if (!remoteFI.exists()) {
+      log(0, "File \"" + remoteFI.remoteToString() + "\" doesn't exist\n");
+      error = true;
+    }
+    if (!remoteFI.isFile()) {
+      log(0, "\"" + remoteFI.remoteToString() + "\" is not a file\n");
+      error = true;
+    }
+    
+    byte[] buffer = null;
+    List<int[]> chunks = remoteFI.getChunksList(); 
+    
+    if (!error) {
+      FileOutputStream fos = new FileOutputStream(localF);
+      
+      for (int[] chunk : chunks) {
+        buffer = dataNodes[chunk[1]].getChunk(chunk[0]);
+        if (buffer != null) {
+          log(0, "buffer.length: " + buffer.length + "\n");
+        } else {
+          log(0, "Can't read chunk " + chunk[0] + " from node " + chunk[1]);
+        }
+        fos.write(buffer);
+      }
+      fos.close();
+      
+      log(0, "File was saved from \"" + remoteFI.remoteToString() + "\" to " + localF.getCanonicalPath() + "\n");
+    }
   }  
 }
