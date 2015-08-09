@@ -35,6 +35,180 @@ public class Client {
   private static String currentFolder = "\\";
   
   static HashSet<String> dataNodesAddresses;
+  
+  static NameNodeInterface nameNode = null;
+  static DataNodeInterface[] dataNodes = null;
+  
+  static String normalizePath(String path) {
+    if (path.startsWith("\\")) {
+      return path;
+    } else {
+      return currentFolder + "\\" + path;
+    }
+  }
+  
+  static void makeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException {
+    RemoteFileInterface folder = nameNode.getFile(path);
+    if (folder.exists()) {
+      log(0, "Name \"" + folder.remoteToString() + "\" already exists\n");
+    } else {
+      // create directory
+      if (folder.mkdir()) {
+        log(0, "Directory \"" + folder.remoteToString() + "\" has being created\n");
+      } else {
+        log(0, "Directory \"" + folder.remoteToString() + "\" can't be created\n");
+      }
+    }
+  }
+  
+  static void removeDirectory (String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface folder = nameNode.getFile(path);
+    
+    if (folder.getVirtualPath().equals("\\")) {
+      log(0, "You can't remove root of the DFS.\n");
+      log(0, "To clear everything use: init\n");
+    } else if (!folder.exists()) {
+      log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
+    } else if (!folder.isDirectory()) {
+      log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
+    } else {
+      switch (folder.isEmpty()) {
+        case -1:
+          // this is not possible, because we've filtered it earlier
+          log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
+          break;
+        case 0:
+          // directory is not empty, ask about recursive delete
+          log(0, "Directory \"" + folder.remoteToString() + "\" is not empty. Delete recursively?\n");
+          System.out.print(Logger.dateFormatter.format(System.currentTimeMillis()) + " >> Yes or No >> ");
+          if (userInput.hasNextLine()) {
+            message = userInput.nextLine();
+          } else {
+            message = "n";
+          }
+          if (message.trim().toLowerCase().equals("y") || message.trim().toLowerCase().equals("yes")) {
+            if (folder.delete(true)) {
+              log(0, "Directory \"" + folder.remoteToString() + "\" and its content was removed\n");
+            } else {
+              log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
+            }
+          } else {
+            log(0, "Directory \"" + folder.remoteToString() + "\" was not deleted\n");
+          }
+          break;
+        case 1:
+          if (folder.delete(false)) {
+            log(0, "Directory \"" + folder.remoteToString() + "\" was removed\n");
+          } else {
+            log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
+          }
+          break;
+      }
+    }
+  }
+  
+  static void deleteFile(String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface file = nameNode.getFile(path);
+    if (!file.exists()) {
+      log(0, "File \"" + file.remoteToString() + "\" doesn't exist\n");
+    } else if (!file.isFile()) {
+      log(0, "\"" + file.remoteToString() + "\" is not a file\n");
+    } else {
+      if (file.delete(true)) {
+        log(0, "File \"" + file.remoteToString() + "\" was deleted\n");
+      } else {
+        log(0, "File \"" + file.remoteToString() + "\" can't be deleted\n");
+      }
+    }
+  }
+  
+  static void uploadFile(String local, String remote) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface remoteFI = nameNode.getFile(remote);
+    
+    boolean error = false;
+    if (remoteFI.exists()) {
+      log(0, "Name \"" + remoteFI.remoteToString() + "\" is already used\n");
+      error = true;
+    } 
+    File localF = new File(local);
+    if (!localF.exists()) {
+      log(0, "File \"" + localF + "\" doesn't exist\n");
+      error = true;
+    }
+    if (!localF.isFile()) {
+      log(0, "\"" + localF + "\" is not a file\n");
+      error = true;
+    }
+    
+    byte[] buffer = new byte[65536];
+    byte[] chunk = null;
+    List<int[]> chunks = new ArrayList<int[]>(); 
+    int hash;
+    int dataNodeId;
+    int chunkLength;
+    if (!error) {
+      FileInputStream fis = new FileInputStream(localF);
+      for (int i = 0; (chunkLength = fis.read(buffer)) != -1; i++) {
+        log(0, "chunkLength: " + chunkLength + ", buffer.length: " + buffer.length + "\n");
+        chunk = Arrays.copyOfRange(buffer, 0, chunkLength);
+        hash = Arrays.hashCode(chunk);
+        // trick that not to get negative values here
+        dataNodeId = (hash % nameNode.numberOfDataNodes() + nameNode.numberOfDataNodes()) % nameNode.numberOfDataNodes();
+        if (dataNodes[dataNodeId].saveChunk(chunk)) {
+          int[] chunkData = {hash, dataNodeId};
+          chunks.add(chunkData);
+        } else {
+          log(0, "Can't save chunk " + hash + " at node " + (dataNodeId + 1));
+        }
+      }
+      fis.close();
+      
+      // save chunk list to name node
+      remoteFI.saveChunksList(chunks);
+      log(0, "File was uploaded from \"" + localF.getCanonicalPath() + "\" to " + remoteFI.remoteToString() + "\n");
+    }
+  }
+  
+  static void downloadFile (String remote, String local) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    RemoteFileInterface remoteFI = nameNode.getFile(remote);
+    
+    File localF = new File(local);
+    
+    boolean error = false;
+    if (localF.exists()) {
+      log(0, "Name \"" + localF.getCanonicalPath() + "\" is already used\n");
+      error = true;
+    } 
+    
+    if (!remoteFI.exists()) {
+      log(0, "File \"" + remoteFI.remoteToString() + "\" doesn't exist\n");
+      error = true;
+    }
+    if (!remoteFI.isFile()) {
+      log(0, "\"" + remoteFI.remoteToString() + "\" is not a file\n");
+      error = true;
+    }
+    
+    byte[] buffer = null;
+    List<int[]> chunks = remoteFI.getChunksList(); 
+    
+    if (!error) {
+      FileOutputStream fos = new FileOutputStream(localF);
+      
+      for (int[] chunk : chunks) {
+        buffer = dataNodes[chunk[1]].getChunk(chunk[0]);
+        if (buffer != null) {
+          log(0, "buffer.length: " + buffer.length + "\n");
+        } else {
+          log(0, "Can't read chunk " + chunk[0] + " from node " + chunk[1]);
+        }
+        fos.write(buffer);
+      }
+      fos.close();
+      
+      log(0, "File was saved from \"" + remoteFI.remoteToString() + "\" to " + localF.getCanonicalPath() + "\n");
+    }
+  }
    
   public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException {
 
@@ -58,11 +232,9 @@ public class Client {
       //Registry registry = LocateRegistry.getRegistry(args[1]);
       //NameNodeInterface nameNode = (NameNodeInterface) registry.lookup("NameNode");
       
-      NameNodeInterface nameNode = (NameNodeInterface) Naming.lookup("NameNode");
+      nameNode = (NameNodeInterface) Naming.lookup("NameNode");
       RemoteFileInterface remoteFile = (RemoteFileInterface) Naming.lookup("RemoteFile");
       //DataNodeInterface dataNode = (DataNodeInterface) Naming.lookup("DataNode");
-      
-      DataNodeInterface[] dataNodes = null; 
       
       dataNodesAddresses = nameNode.getDataNodesAddresses();
       log(0, "There are " + dataNodesAddresses.size() + " data nodes:\n");
@@ -105,12 +277,8 @@ public class Client {
             folder = nameNode.getFile(currentFolder);
           } else if (splitArray.length == 2) {
             // print content of the directory in parameter
-            String path = null;
-            if (splitArray[1].startsWith("\\")) {
-              path = splitArray[1];
-            } else {
-              path = currentFolder + "\\" + splitArray[1];
-            }
+            String path = normalizePath(splitArray[1]);
+            
             folder = nameNode.getFile(path);
             if (!folder.exists()) {
               log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
@@ -146,12 +314,8 @@ public class Client {
           if (splitArray.length < 2 || splitArray.length > 2) {
             log(0, "Use: cd <directory name>");
           } else {
-            String path = null;
-            if (splitArray[1].startsWith("\\")) {
-              path = splitArray[1];
-            } else {
-              path = currentFolder + "\\" + splitArray[1];
-            }
+            String path = normalizePath(splitArray[1]);
+            
             RemoteFileInterface folder = nameNode.getFile(path);
             if (!folder.exists()) {
               log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
@@ -168,23 +332,9 @@ public class Client {
           if (splitArray.length < 2 || splitArray.length > 2) {
             log(0, "Use: mkdir <directory name>");
           } else {
-            String path = null;
-            if (splitArray[1].startsWith("\\")) {
-              path = splitArray[1];
-            } else {
-              path = currentFolder + "\\" + splitArray[1];
-            }
-            RemoteFileInterface folder = nameNode.getFile(path);
-            if (folder.exists()) {
-              log(0, "Name \"" + folder.remoteToString() + "\" already exists\n");
-            } else {
-              // create directory
-              if (folder.mkdir()) {
-                log(0, "Directory \"" + folder.remoteToString() + "\" has being created\n");
-              } else {
-                log(0, "Directory \"" + folder.remoteToString() + "\" can't be created\n");
-              }
-            }
+            String path = normalizePath(splitArray[1]);
+            
+            makeDirectory(path);
           }
           
         } else if (msg.equals("rmdir")) {
@@ -192,56 +342,9 @@ public class Client {
           if (splitArray.length < 2 || splitArray.length > 2) {
             log(0, "Use: rmdir <directory name>");
           } else {
-            String path = null;
-            if (splitArray[1].startsWith("\\")) {
-              path = splitArray[1];
-            } else {
-              path = currentFolder + "\\" + splitArray[1];
-            }
+            String path = normalizePath(splitArray[1]);
             
-            RemoteFileInterface folder = nameNode.getFile(path);
-            
-            if (folder.getVirtualPath().equals("\\")) {
-              log(0, "You can't remove root of the DFS.\n");
-              log(0, "To clear everythin use: init\n");
-            } else if (!folder.exists()) {
-              log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
-            } else if (!folder.isDirectory()) {
-              log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
-            } else {
-              switch (folder.isEmpty()) {
-                case -1:
-                  // this is not possible, because we've filtered it earlier
-                  log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
-                  break;
-                case 0:
-                  // directory is not empty, ask about recursive delete
-                  log(0, "Directory \"" + folder.remoteToString() + "\" is not empty. Delete recursively?\n");
-                  System.out.print(Logger.dateFormatter.format(System.currentTimeMillis()) + " >> Yes or No >> ");
-                  if (userInput.hasNextLine()) {
-                    message = userInput.nextLine();
-                  } else {
-                    message = "n";
-                  }
-                  if (message.trim().toLowerCase().equals("y") || message.trim().toLowerCase().equals("yes")) {
-                    if (folder.delete(true)) {
-                      log(0, "Directory \"" + folder.remoteToString() + "\" and its content was removed\n");
-                    } else {
-                      log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
-                    }
-                  } else {
-                    log(0, "Directory \"" + folder.remoteToString() + "\" was not deleted\n");
-                  }
-                  break;
-                case 1:
-                  if (folder.delete(false)) {
-                    log(0, "Directory \"" + folder.remoteToString() + "\" was removed\n");
-                  } else {
-                    log(0, "Directory \"" + folder.remoteToString() + "\" can't be removed\n");
-                  }
-                  break;
-              }
-            }
+            removeDirectory(path);
           }
           
         } else if (msg.equals("upload")) {
@@ -250,56 +353,9 @@ public class Client {
             log(0, "Use: upload <local name> <remote name>\n");
           } else {
             String local = splitArray[1];
-            String remote = null;
-            if (splitArray[2].startsWith("\\")) {
-              remote = splitArray[2];
-            } else {
-              remote = currentFolder + "\\" + splitArray[2];
-            }
-            RemoteFileInterface remoteFI = nameNode.getFile(remote);
+            String remote = normalizePath(splitArray[2]);
             
-            boolean error = false;
-            if (remoteFI.exists()) {
-              log(0, "Name \"" + remoteFI.remoteToString() + "\" is already used\n");
-              error = true;
-            } 
-            File localF = new File(local);
-            if (!localF.exists()) {
-              log(0, "File \"" + localF + "\" doesn't exist\n");
-              error = true;
-            }
-            if (!localF.isFile()) {
-              log(0, "\"" + localF + "\" is not a file\n");
-              error = true;
-            }
-            
-            byte[] buffer = new byte[65536];
-            byte[] chunk = null;
-            List<int[]> chunks = new ArrayList<int[]>(); 
-            int hash;
-            int dataNodeId;
-            int chunkLength;
-            if (!error) {
-              FileInputStream fis = new FileInputStream(localF);
-              for (int i = 0; (chunkLength = fis.read(buffer)) != -1; i++) {
-                log(0, "chunkLength: " + chunkLength + ", buffer.length: " + buffer.length + "\n");
-                chunk = Arrays.copyOfRange(buffer, 0, chunkLength);
-                hash = Arrays.hashCode(chunk);
-                // trick that not to get negative values here
-                dataNodeId = (hash % nameNode.numberOfDataNodes() + nameNode.numberOfDataNodes()) % nameNode.numberOfDataNodes();
-                if (dataNodes[dataNodeId].saveChunk(chunk)) {
-                  int[] chunkData = {hash, dataNodeId};
-                  chunks.add(chunkData);
-                } else {
-                  log(0, "Can't save chunk " + hash + " at node " + (dataNodeId + 1));
-                }
-              }
-              fis.close();
-              
-              // save chunk list to name node
-              remoteFI.saveChunksList(chunks);
-              log(0, "File was uploaded from \"" + localF.getCanonicalPath() + "\" to " + remoteFI.remoteToString() + "\n");
-            }
+            uploadFile(local, remote);
           }
           
         } else if (msg.equals("download")) {
@@ -307,51 +363,10 @@ public class Client {
           if (splitArray.length < 3 || splitArray.length > 3) {
             log(0, "Use: download <remote name> <local name>\n");
           } else {
+            String remote = normalizePath(splitArray[1]);
             String local = splitArray[2];
-            String remote = null;
-            if (splitArray[1].startsWith("\\")) {
-              remote = splitArray[1];
-            } else {
-              remote = currentFolder + "\\" + splitArray[1];
-            }
-            RemoteFileInterface remoteFI = nameNode.getFile(remote);
             
-            File localF = new File(local);
-            
-            boolean error = false;
-            if (localF.exists()) {
-              log(0, "Name \"" + localF.getCanonicalPath() + "\" is already used\n");
-              error = true;
-            } 
-            
-            if (!remoteFI.exists()) {
-              log(0, "File \"" + remoteFI.remoteToString() + "\" doesn't exist\n");
-              error = true;
-            }
-            if (!remoteFI.isFile()) {
-              log(0, "\"" + remoteFI.remoteToString() + "\" is not a file\n");
-              error = true;
-            }
-            
-            byte[] buffer = null;
-            List<int[]> chunks = remoteFI.getChunksList(); 
-            
-            if (!error) {
-              FileOutputStream fos = new FileOutputStream(localF);
-              
-              for (int[] chunk : chunks) {
-                buffer = dataNodes[chunk[1]].getChunk(chunk[0]);
-                if (buffer != null) {
-                  log(0, "buffer.length: " + buffer.length + "\n");
-                } else {
-                  log(0, "Can't read chunk " + chunk[0] + " from node " + chunk[1]);
-                }
-                fos.write(buffer);
-              }
-              fos.close();
-              
-              log(0, "File was saved from \"" + remoteFI.remoteToString() + "\" to " + localF.getCanonicalPath() + "\n");
-            }
+            downloadFile(remote, local);
           }
           
         } else if (msg.equals("delete")) {
@@ -359,24 +374,9 @@ public class Client {
           if (splitArray.length < 2 || splitArray.length > 2) {
             log(0, "Use: delete <file name>");
           } else {
-            String path = null;
-            if (splitArray[1].startsWith("\\")) {
-              path = splitArray[1];
-            } else {
-              path = currentFolder + "\\" + splitArray[1];
-            }
-            RemoteFileInterface file = nameNode.getFile(path);
-            if (!file.exists()) {
-              log(0, "File \"" + file.remoteToString() + "\" doesn't exist\n");
-            } else if (!file.isFile()) {
-              log(0, "\"" + file.remoteToString() + "\" is not a file\n");
-            } else {
-              if (file.delete(true)) {
-                log(0, "File \"" + file.remoteToString() + "\" was deleted\n");
-              } else {
-                log(0, "File \"" + file.remoteToString() + "\" can't be deleted\n");
-              }
-            }
+            String path = normalizePath(splitArray[1]);
+            
+            deleteFile(path);
           }
           
         } else if (msg.equals("init")) {
