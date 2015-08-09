@@ -43,6 +43,8 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
   // data nodes to store chunks
   public static DataNodeInterface[] dataNodes = null;
   
+  static int port;
+  
   public static void main(String[] args) throws IOException, UninitializedLoggerException {
     try {
       // init everything to log messages
@@ -52,7 +54,7 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
         initLogger(0, null); // 1 - logLevel, 2 - logFilename
       }
       
-      if (args.length < 4) {
+      if (args.length < 5) {
         throw new IncompleteArgumentListException();
       }
       
@@ -115,7 +117,18 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
       
       //Registry reg = LocateRegistry.createRegistry(0);
       //UnicastRemoteObject.unexportObject(reg,true);
+
+      port = Integer.parseInt(args[4]);
       
+      Registry registry = LocateRegistry.createRegistry(port);
+      
+      registry.rebind("NameNode", nameNode);
+      log(0, "NameNode has being succesfully bounded.\n");
+      
+      registry.rebind("RemoteFile", remoteFile);
+      log(0, "RemoteFile has being succesfully bounded.\n");
+      
+      /*
       // unbind NameNode first that we can use this name for our own object
       try {
         Naming.unbind("NameNode");
@@ -132,6 +145,7 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
       }
       Naming.bind("RemoteFile", remoteFile);
       log(0, "RemoteFile has being succesfully bounded.\n");
+      */
       
       log(0, "Listening to incoming requests...\n");
       
@@ -142,10 +156,10 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
     } catch (IncorrectLogFileException e) {
       log(0, "File to store log files can't be created or inaccessible.");
     } catch (IncompleteArgumentListException e) {
-      log(0, "Use: NameNode logFileName basePath hddQuota dataNodesFileName");
-    } catch (AlreadyBoundException e) {
+      log(0, "Use: NameNode logFileName basePath hddQuota dataNodesFileName port");
+    } /* catch (AlreadyBoundException e) {
       log(0, "NameNode is already bounded to some RMI object");
-    } catch (NumberFormatException e) {
+    } */ catch (NumberFormatException e) {
       // TODO Auto-generated catch block
       e.printStackTrace();
     } catch (NotBoundException e) {

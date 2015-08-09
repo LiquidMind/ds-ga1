@@ -19,6 +19,8 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
+import mapreduce.node.*;;
+
 
 public class MasterNode {
   //flag to notify that client should keep working
@@ -43,8 +45,8 @@ public class MasterNode {
   static DataNodeInterface[] dataNodes = null;
   
   static String workerNodesFileName;
-  
-  static HashSet<String> workerNodesAddresses;
+  static HashSet<String> workerNodesAddresses = new HashSet<String>();;
+  static WorkerNodeInterface[] workerNodes = null;
   
   public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException {
 
@@ -96,19 +98,18 @@ public class MasterNode {
       List<String> lines = Files.readAllLines(Paths.get(workerNodesFileName), Charset.defaultCharset());
       for (String line : lines) {
         log(0, line + "\n");
-        dataNodesAddresses.add(line.trim());
+        workerNodesAddresses.add(line.trim());
       }
-      if (dataNodesAddresses.isEmpty()) {
+      if (workerNodesAddresses.isEmpty()) {
         throw new EmptyWorkerNodesFileException();
       }
       
-      workerNodesAddresses = nameNode.getDataNodesAddresses();
       log(0, "There are " + workerNodesAddresses.size() + " worker nodes:\n");
-      //workerNodes = new WorkerNodeInterface[workerNodesAddresses.size()];
-      for (String s : dataNodesAddresses) {
+      workerNodes = new WorkerNodeInterface[workerNodesAddresses.size()];
+      for (String s : workerNodesAddresses) {
         String[] parts = s.split(":");
         log(0, "ID: " + parts[0] + ", host: " + parts[1] + ", port: " + parts[2] + "\n");
-      //  workerNodes[Integer.parseInt(parts[0]) - 1] = (WorkerNodeInterface) Naming.lookup("//" + parts[1] + ":" + parts[2] + "/WorkerNode"); // "//host:port/name"
+        workerNodes[Integer.parseInt(parts[0]) - 1] = (WorkerNodeInterface) Naming.lookup("//" + parts[1] + ":" + parts[2] + "/mpnode"); // "//host:port/name"
       }
       
       userInput  = new Scanner(System.in);
@@ -289,7 +290,7 @@ public class MasterNode {
       log(0, "Client was shutted down");
       
     } catch (IncompleteArgumentListException e) {
-      log(0, "Use: Client logFileName NameNodeAddress");
+      log(0, "Use: MasterNode logFileName NameNodeAddress workNodesFileName");
     } catch (IncorrectLogFileException e) {
       log(0, "File to store log files can't be created or inaccessible.");
     } catch (RemoteException e) {
