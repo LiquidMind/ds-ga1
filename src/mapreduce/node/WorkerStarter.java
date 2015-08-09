@@ -1,5 +1,7 @@
 package mapreduce.node;
 
+import mapreduce.utils.MapReduce;
+
 /**
  * Created by Aidar on 09.08.2015.
  */
@@ -12,7 +14,8 @@ public class WorkerStarter {
             WorkerNode node;
             node=new WorkerNode(port, "mpnode");
             node.startRMI();
-            node.addJob("qwe", (byte) 1,"example1.jar","TestClass");
+            node.addJob("qwe", MapReduce.TYPE_MAPPER, "example1.jar", "TestMapReduce");
+            node.addJob("qwe", MapReduce.TYPE_REDUCER, "example1.jar", "TestMapReduce");
         }
         catch (Exception e){
             SysLogger.getInstance().warning("Can not start a worker");

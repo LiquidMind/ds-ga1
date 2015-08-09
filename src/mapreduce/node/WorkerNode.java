@@ -1,6 +1,6 @@
 package mapreduce.node;
 
-import mapreduce.utils.Mapper;
+import mapreduce.utils.MapReduce;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -30,12 +30,14 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             URLClassLoader classLoader=new URLClassLoader(new URL[]{url});
             //todo make this
             Class c=classLoader.loadClass(className);
-//            Class c= TestClass.class;
 
-            Object jobObject=c.newInstance();
-            if (jobObject instanceof Mapper){
-                Mapper m=(Mapper) jobObject;
-                m.map();
+            MapReduce jobObject= (MapReduce) c.newInstance();
+            if (type==MapReduce.TYPE_REDUCER){
+//                MapReduce m=(MapReduce) jobObject;
+                jobObject.map();
+            }
+            if (type==MapReduce.TYPE_REDUCER){
+                jobObject.reduce();
             }
         } catch (MalformedURLException e) {
             e.printStackTrace();
