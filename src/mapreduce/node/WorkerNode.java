@@ -1,5 +1,7 @@
 package mapreduce.node;
 
+import mapreduce.utils.Mapper;
+
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -24,12 +26,17 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
     public void addJob(String jobName, byte type, String pathToJar, String className) throws RemoteException{
         SysLogger.getInstance().info("Job "+jobName+" started");
         try {
-            URL url = new URL("jar","","example1.jar!/");
+            URL url = new URL("file:///"+pathToJar);
             URLClassLoader classLoader=new URLClassLoader(new URL[]{url});
+            //todo make this
             Class c=classLoader.loadClass(className);
+//            Class c= TestClass.class;
 
             Object jobObject=c.newInstance();
-            jobObject.getClass();
+            if (jobObject instanceof Mapper){
+                Mapper m=(Mapper) jobObject;
+                m.map();
+            }
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
