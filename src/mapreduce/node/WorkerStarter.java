@@ -12,6 +12,7 @@ public class WorkerStarter {
             WorkerNode node;
             node=new WorkerNode(port, "mpnode");
             node.startRMI();
+            node.addJob("qwe", (byte) 1,"qwe","TestClass");
         }
         catch (Exception e){
             SysLogger.getInstance().warning("Can not start a worker");
