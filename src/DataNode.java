@@ -12,6 +12,8 @@ import java.rmi.AlreadyBoundException;
 import java.rmi.Naming;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -102,6 +104,12 @@ public class DataNode extends UnicastRemoteObject implements DataNodeInterface, 
       
       // unbind DataNode first that we can use this name for our own object
       
+      Registry registry = LocateRegistry.createRegistry(localPort);
+      
+      registry.rebind("DataNode", dataNode);
+      log(0, "DataNode has being succesfully bounded.\n");
+      
+      /*
       String rmiURI = "//localhost:" + localPort + "/DataNode";
       try {
         Naming.unbind(rmiURI);
@@ -110,6 +118,7 @@ public class DataNode extends UnicastRemoteObject implements DataNodeInterface, 
       }
       Naming.bind(rmiURI, dataNode);
       log(0, "DataNode has being succesfully bounded.\n");
+      */
       
       /*
       try {
@@ -156,9 +165,9 @@ public class DataNode extends UnicastRemoteObject implements DataNodeInterface, 
       log(0, "File to store log files can't be created or inaccessible.");
     } catch (IncompleteArgumentListException e) {
       log(0, "Use: DataNode logFileName basePath hddQuota databaseFileName");
-    } catch (AlreadyBoundException e) {
+    } /* catch (AlreadyBoundException e) {
       log(0, "DataNode is already bounded to some RMI object");
-    } catch (ClassNotFoundException e) {
+    } */ catch (ClassNotFoundException e) {
       log(0, "Can't find necessary class");
       e.printStackTrace();
     } catch (SQLException e) {
