@@ -1,0 +1,28 @@
+Innopolis University Distributed Systems Summer 2015
+Individual Assignment#3:
+Urysov and Kovtunenko Leader Election Due: Thu Jun 26, 2015
+Project description
+This project asks you to implement shared document editor by using one of consensus algorithm on your choice:
+? Raft
+? Paxos
+To simplify the assignment and get rid of UI part, the document can be replaced by single text line.
+Implementation requirements
+? You have to use distributed system of master nodes (at least 5)
+? Your implementation should contain two major parts:
+o First part corresponds to selection of a leader
+o The second part consist of an broadcast shared data string initiated by the leader
+? Implementation should satisfy to consensus algorithm requirements. For example for Paxos implementation system should be able to tolerate loss of not more than half of servers
+Leader nodes requirements
+? The chosen leader (among those 5 master nodes) should select the right value according to selected algorithm or update current value if such request was received from the slave node
+? Leader should send all information about connected clients to other servers
+? Minority of master nodes should add randomly generated delay for communication with other master nodes, which should guarantee different values at least on some master nodes
+? Leader should write the log file
+? After leader election, it should broadcast his address to all clients
+Client’s requirements
+? Each client should be able to read and write data string from the leading server
+? Each client should write the log file
+Additional requirements (extra points will be assigned)
+? The system should be robust. It should be able to continue operation even if one of the participant nodes crashes, and it should be able to recover the state of a node following a crash so that it can resume operation.
+Deliverables
+? Source code
+? Short report with explanation of the algorithm you chose, assumptions you made and other important aspects of implementation

@@ -1,0 +1,11 @@
+This assignment is intended to get you started with the course: to solve this assignment you will need to figure out how to create virtual machines and allow them to communicate to each other. The logic of the program itself is simple:
+Write client and server applications. Every message sent by a client should be echoed to all connected clients. Applications shoud interact with each other - it can be plain communication via sockets, RPC or RMI. You are not allowed to use any existing implementations of RPC/RMI - you have to build them on your own.
+The project is intentionally open-ended and there are many possible solutions.
+You're free to pick any language of your choice.
+We expect you to use Digital Ocean virtual machines or Docker containers. You'll have to submit:
+•        source code
+•        information on how to access to your virtual machines (for Digital Ocean)/ names of Docker images
+•        documentation how to launch your system.
+Good luck!
+
+
