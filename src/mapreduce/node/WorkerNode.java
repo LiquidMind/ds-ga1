@@ -32,7 +32,7 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             Class c=classLoader.loadClass(className);
 
             MapReduce jobObject= (MapReduce) c.newInstance();
-            if (type==MapReduce.TYPE_REDUCER){
+            if (type==MapReduce.TYPE_MAPPER){
 //                MapReduce m=(MapReduce) jobObject;
                 jobObject.map();
             }
