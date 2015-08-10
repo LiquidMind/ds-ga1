@@ -7,10 +7,6 @@ import java.rmi.RemoteException;
  * Created by Aidar on 09.08.2015.
  */
 public interface WorkerNodeInterface extends Remote {
-    public static final byte STATE_DONE=1;
-    public static final byte STATE_INPROGRESS=1;
-    public static final byte STATE_FAILED=2;
-
     /**
      * Start a new job
      * @param jobName
@@ -26,5 +22,5 @@ public interface WorkerNodeInterface extends Remote {
      * @param jobName
      * @return
      */
-    public byte getJobState(String jobName);
+    public byte getJobState(String jobName) throws RemoteException;
 }

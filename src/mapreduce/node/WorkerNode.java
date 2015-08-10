@@ -6,11 +6,13 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.rmi.RemoteException;
+import java.util.HashMap;
 
 /**
  * Created by Aidar on 09.08.2015.
  */
 public class WorkerNode extends RMIServer implements WorkerNodeInterface {
+    private HashMap<String,Job> jobList;
     /**
      * Constructor
      *
@@ -20,6 +22,7 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
      */
     public WorkerNode(int port, String serviceName) throws RemoteException {
         super(port, serviceName);
+        jobList=new HashMap<String, Job>();
     }
 
     @Override
@@ -31,14 +34,12 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             //todo make this
             Class c=classLoader.loadClass(className);
 
-            MapReduce jobObject= (MapReduce) c.newInstance();
-            if (type==MapReduce.TYPE_MAPPER){
-//                MapReduce m=(MapReduce) jobObject;
-                jobObject.map();
-            }
-            if (type==MapReduce.TYPE_REDUCER){
-                jobObject.reduce();
-            }
+            MapReduce jobObject=(MapReduce) c.newInstance();
+            Job job=new Job(jobName, type, jobObject);
+            jobList.put(jobName,job);
+
+            job.start(); //start new thread
+            //return control
         } catch (MalformedURLException e) {
             e.printStackTrace();
         } catch (ClassNotFoundException e) {
@@ -52,6 +53,6 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
 
     @Override
     public byte getJobState(String jobName) {
-        return WorkerNode.STATE_INPROGRESS;
+        return jobList.get(jobName).getJobState();
     }
 }
