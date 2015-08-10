@@ -49,4 +49,9 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             e.printStackTrace();
         }
     }
+
+    @Override
+    public byte getJobState(String jobName) {
+        return WorkerNode.STATE_INPROGRESS;
+    }
 }
