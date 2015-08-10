@@ -10,6 +10,6 @@ public interface MapReduce {
     public static final byte TYPE_MAPPER=0;
     public static final byte TYPE_REDUCER=1;
 
-    public void map();
+    public void map(String key, String value, OutputCollector collector);
     public void reduce();
 }

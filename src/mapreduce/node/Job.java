@@ -1,6 +1,7 @@
 package mapreduce.node;
 
 import mapreduce.utils.MapReduce;
+import mapreduce.utils.OutputCollector;
 
 /**
  * Created by Aidar on 10.08.2015.
@@ -35,7 +36,12 @@ public class Job extends Thread {
         state=STATE_INPROGRESS;
         try {
             if (type==MapReduce.TYPE_MAPPER){
-                mapReduce.map();
+                //todo this is the issue - we only instantiate same type of collectors
+                OutputCollector<String, Integer> collector=new OutputCollector<String, Integer>();
+                //todo download the file from DFS
+                //todo read file string by string - need to setup code for this
+                mapReduce.map(jobname,"",collector);
+//                collector.
             }
             if (type==MapReduce.TYPE_REDUCER){
                 mapReduce.reduce();
