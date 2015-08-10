@@ -299,7 +299,7 @@ public class MasterNode {
             
             for (j = 0, k = 0; j < mCount && k < workerNodes.length; j++) {
               try {
-//                workerNodes[i].addJob(jobName, type, pathToJar, className);
+                workerNodes[i].addJob(jobName, type, pathToJar, className);
                 k = 0;
               } catch (Exception e) {
                 log(0, "Exception while executing mapper job no. " + j);
@@ -312,7 +312,7 @@ public class MasterNode {
             
             for (j = 0, k = 0; j < rCount && k < workerNodes.length; j++) {
               try {
-//                workerNodes[i].addJob(jobName, type, pathToJar, className);
+                workerNodes[i].addJob(jobName, type, pathToJar, className);
                 k = 0;
               } catch (Exception e) {
                 log(0, "Exception while executing mapper job no. " + j);
