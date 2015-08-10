@@ -16,11 +16,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Scanner;
+import java.util.concurrent.LinkedTransferQueue;
 import java.util.regex.Pattern;
 
-import mapreduce.node.*;;
+import mapreduce.node.*;
+import mapreduce.utils.MapReduce;
 
 
 public class MasterNode {
@@ -288,44 +293,115 @@ public class MasterNode {
             String pathToData = normalizePath(splitArray[5]);
             String pathToResult = normalizePath(splitArray[6]);
             
-            boolean taskNotFinished = true;
-            
-            HashMap<Integer, String> mappers = new HashMap<Integer, String>();
-            HashMap<Integer, String> reducers = new HashMap<Integer, String>();
+            boolean jobNotFinished = true;
             
             int i = 0;
             int j = 0;
             int k = 0;
             
-            for (j = 0, k = 0; j < mCount && k < workerNodes.length; j++) {
+            // HashMap<mapperId: from 0 to mCount, nodeId: from 0 to workerNodes.length>
+            HashMap<Integer, Integer> workingMappers = new HashMap<Integer, Integer>();
+            LinkedTransferQueue<Integer> unassignedMappers = new LinkedTransferQueue<Integer>();
+            for (i = 0; i < mCount; i++) {
+              unassignedMappers.add(i);
+            }
+            HashMap<Integer, Integer> finishedMappers = new HashMap<Integer, Integer>();
+            
+            // HashMap<reducerId: from 0 to rCount, nodeId: from 0 to workerNodes.length>
+            HashMap<Integer, Integer> workingReducers = new HashMap<Integer, Integer>();
+            LinkedTransferQueue<Integer> unassignedReducers = new LinkedTransferQueue<Integer>();
+            for (i = 0; i < rCount; i++) {
+              unassignedReducers.add(i);
+            }
+            HashMap<Integer, Integer> finishedReducers = new HashMap<Integer, Integer>();
+            
+            HashSet<Integer> failedWorkers = new HashSet<Integer>();
+            
+            // worker node to start assigning tasks from
+            i = randomWithRange(0, workerNodes.length - 1);
+
+            for (j = 0; j < rCount && k < workerNodes.length; j++) {
               try {
-                workerNodes[i].addJob(jobName, type, pathToJar, className);
+                workerNodes[i].addJob(jobName, MapReduce.TYPE_REDUCER, pathToJar, className);
                 k = 0;
               } catch (Exception e) {
                 log(0, "Exception while executing mapper job no. " + j);
                 e.printStackTrace();
                 j--;
-                i++;
                 k++;
+              }
+              i = (i + 1) / workerNodes.length;
+            }
+            
+            // while we have incomplete map tasks
+            while (finishedMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
+              if (failedWorkers.contains(i)) {
+                // if current worker failed move to next
+                i = (i + 1) / workerNodes.length;
+                continue;
+              }
+              // while we have unassigned map tasks
+              while (unassignedMappers.size() > 0 && failedWorkers.size() < workerNodes.length) {
+                j = unassignedMappers.poll();
+                try {
+                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className);
+                  workingMappers.put(j, i); // add map task to the list of working mappers
+                } catch (Exception e) {
+                  log(0, "Exception while executing mapper job no. " + j);
+                  e.printStackTrace();
+                  unassignedMappers.add(j); // return map back to the list of unassigned map tasks
+                  failedWorkers.add(i); // add worker to the list of failed workers
+                }
+                // move to next worker
+                i = (i + 1) / workerNodes.length;
+              }
+              
+              // iterate through all tasks and get their status
+              Iterator<Entry<Integer, Integer>> it = workingMappers.entrySet().iterator();
+              while (it.hasNext()) {
+                Map.Entry<Integer, Integer> pair = it.next();
+                int taskId = pair.getKey();
+                int workerId = pair.getValue();
+                int jobState = workerNodes[workerId].getJobState(jobName);
+                
+                switch (jobState) {
+                  case Job.STATE_DONE:
+                    log(0, "Mapper task no. " + taskId + " has been finished\n");
+                    log(0, "Added it to the list of finished tasks\n");
+                    workingMappers.remove(taskId);
+                    finishedMappers.put(taskId, workerId);
+                    break;
+                  case Job.STATE_INPROGRESS:
+                    // do nothing
+                    break;
+                  case Job.STATE_FAILED:
+                    log(0, "Mapper task no. " + taskId + " has failed on worker no. " + workerId + "\n");
+                    log(0, "Added it to the list of failed workers\n");
+                    workingMappers.remove(taskId);
+                    unassignedMappers.add(taskId);
+                    failedWorkers.add(workerId);
+                    break;  
+                  case Job.STATE_STOPPED:
+                    // do nothing
+                    break;
+                  default:
+                    throw new UnknownJobStateException();  
+                }
+                it.remove(); // avoids a ConcurrentModificationException
               }
             }
             
-            for (j = 0, k = 0; j < rCount && k < workerNodes.length; j++) {
-              try {
-                workerNodes[i].addJob(jobName, type, pathToJar, className);
-                k = 0;
-              } catch (Exception e) {
-                log(0, "Exception while executing mapper job no. " + j);
-                e.printStackTrace();
-                j--;
-                i++;
-                k++;
-              }
+            if (k == workerNodes.length) {
+              log(0, "There are no available worker nodes to add map jobs");
             }
             
-            while (taskNotFinished) {
+            if (k == workerNodes.length) {
+              log(0, "There are no available worker nodes to add reduce jobs");
+            }
+            
+            while (jobNotFinished) {
               //workerNodes[0].addJob(jobName, type, pathToJar, className);
-              taskNotFinished = false;
+              jobNotFinished = false;
             }
           }
         } else if (msg.equals("")) {
@@ -370,6 +446,11 @@ public class MasterNode {
     } catch (EmptyWorkerNodesFileException e) {
       log(0, "File with list of worker nodes is empty.");
     }       
+  }
+  
+  static int randomWithRange(int min, int max) {
+     int range = (max - min) + 1;
+     return (int)(Math.random() * range) + min;
   }
   
   public static void initLogger(int logLevel, String logFilename) throws IncorrectLogFileException {
