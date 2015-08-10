@@ -320,6 +320,7 @@ public class MasterNode {
             // worker node to start assigning tasks from
             i = randomWithRange(0, workerNodes.length - 1);
 
+            /*
             for (j = 0; j < rCount && k < workerNodes.length; j++) {
               try {
                 workerNodes[i].addJob(jobName, MapReduce.TYPE_REDUCER, pathToJar, className);
@@ -332,6 +333,7 @@ public class MasterNode {
               }
               i = (i + 1) / workerNodes.length;
             }
+            */
             
             // while we have incomplete map tasks
             while (finishedMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
@@ -344,7 +346,8 @@ public class MasterNode {
               while (unassignedMappers.size() > 0 && failedWorkers.size() < workerNodes.length) {
                 j = unassignedMappers.poll();
                 try {
-                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className);
+                  // TODO:
+                  // workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, fileName);
                   workingMappers.put(j, i); // add map task to the list of working mappers
                 } catch (Exception e) {
                   log(0, "Exception while executing mapper job no. " + j);
