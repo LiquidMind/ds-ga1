@@ -14,6 +14,7 @@ import java.rmi.registry.Registry;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Scanner;
@@ -289,8 +290,42 @@ public class MasterNode {
             
             boolean taskNotFinished = true;
             
+            HashMap<Integer, String> mappers = new HashMap<Integer, String>();
+            HashMap<Integer, String> reducers = new HashMap<Integer, String>();
+            
+            int i = 0;
+            int j = 0;
+            int k = 0;
+            
+            for (j = 0, k = 0; j < mCount && k < workerNodes.length; j++) {
+              try {
+                workerNodes[i].addJob(jobName, type, pathToJar, className);
+                k = 0;
+              } catch (Exception e) {
+                log(0, "Exception while executing mapper job no. " + j);
+                e.printStackTrace();
+                j--;
+                i++;
+                k++;
+              }
+            }
+            
+            for (j = 0, k = 0; j < rCount && k < workerNodes.length; j++) {
+              try {
+                workerNodes[i].addJob(jobName, type, pathToJar, className);
+                k = 0;
+              } catch (Exception e) {
+                log(0, "Exception while executing mapper job no. " + j);
+                e.printStackTrace();
+                j--;
+                i++;
+                k++;
+              }
+            }
+            
             while (taskNotFinished) {
-              
+              //workerNodes[0].addJob(jobName, type, pathToJar, className);
+              taskNotFinished = false;
             }
           }
         } else if (msg.equals("")) {
