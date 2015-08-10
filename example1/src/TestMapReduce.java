@@ -9,9 +9,10 @@ import java.util.StringTokenizer;
 public class TestMapReduce implements MapReduce {
     @Override
     public void map(String key, String value, OutputCollector collector) {
-        System.out.println("Test map works!");
+//        System.out.println("Test map works!");
         String line = value.toString();
-        StringTokenizer tokenizer = new StringTokenizer(line);
+//        StringTokenizer tokenizer = new StringTokenizer(line, ",", false);
+        StringTokenizer tokenizer = new StringTokenizer(line, " ", false);
         String word="";
         while (tokenizer.hasMoreTokens()) {
             word=tokenizer.nextToken();

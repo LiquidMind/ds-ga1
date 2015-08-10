@@ -26,7 +26,7 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
     }
 
     @Override
-    public void addJob(String jobName, byte type, String pathToJar, String className) throws RemoteException{
+    public void addJob(String jobName, byte type, String pathToJar, String className, String filename) throws RemoteException{
         SysLogger.getInstance().info("Job "+jobName+" started");
         try {
             URL url = new URL("file:///"+pathToJar);
@@ -35,7 +35,7 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             Class c=classLoader.loadClass(className);
 
             MapReduce jobObject=(MapReduce) c.newInstance();
-            Job job=new Job(jobName, type, jobObject);
+            Job job=new Job(jobName, type, jobObject, filename);
             jobList.put(jobName,job);
 
             job.start(); //start new thread

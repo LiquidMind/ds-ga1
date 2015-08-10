@@ -13,9 +13,10 @@ public interface WorkerNodeInterface extends Remote {
      * @param type
      * @param pathToJar
      * @param className
+     * @param filename
      * @throws RemoteException
      */
-    public void addJob(String jobName, byte type, String pathToJar, String className) throws RemoteException;
+    public void addJob(String jobName, byte type, String pathToJar, String className, String filename) throws RemoteException;
 
     /**
      * Get job state
