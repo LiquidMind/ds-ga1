@@ -24,6 +24,11 @@ public class TestMapReduce implements MapReduce {
     @Override
     public void reduce(String key, Iterator values, OutputCollector collector) {
         System.out.println("Test reduce works!");
+        Integer sum=0;
+        while (values.hasNext()) {
+            sum += (Integer) values.next();
+        }
+        collector.collect(key, sum);
     }
 
     /**

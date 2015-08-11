@@ -55,7 +55,7 @@ public class OutputCollector<KEYTYPE, VALTYPE> {
         }
         //todo store each array to separate file
         for (int i=0;i<numberOfReducers;i++){
-            File file = new File("reducer"+i);
+            File file = new File(baseFilename+i);
             FileOutputStream f = null;
             try {
                 f = new FileOutputStream(file);
@@ -68,9 +68,5 @@ public class OutputCollector<KEYTYPE, VALTYPE> {
                 e.printStackTrace();
             }
         }
-    }
-
-    private void writeMapToFile(){
-
     }
 }

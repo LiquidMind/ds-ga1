@@ -5,7 +5,9 @@ import mapreduce.utils.OutputCollector;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.ArrayList;
 import java.util.ListIterator;
+import java.util.TreeMap;
 
 /**
  * Created by Aidar on 10.08.2015.
@@ -53,24 +55,25 @@ public class Job extends Thread {
                         // process the line.
                         mapReduce.map(filename,line,collector);
                     }
-//                    OutputCollector<String, Integer> collector1=collector;
                 }
                 catch (Exception e){
                     e.printStackTrace();
                 }
-                collector.spill("test",2);
+                collector.spill(jobname+"_shuffled_",2);
             }
             if (type==MapReduce.TYPE_REDUCER){
                 //todo traverse all mappers
                 OutputCollector<String, Integer> collector=new OutputCollector<String, Integer>();
-                BufferedReader br = new BufferedReader(new FileReader(filename));
-                String line;
-                //todo assume here we load all keys
-                while ((line = br.readLine()) != null) {
+
+                //todo get relative treemap from each mapper
+                //todo join values by keys
+                TreeMap<String, ArrayList<Integer>> map=new TreeMap<String, ArrayList<Integer>>();
+                //assume here we load all keys
+
+                //traverse all keys
+                for (String key: map.keySet()){
                     // process the line.
-                    mapReduce.map(filename,line,collector);
-//                    ListIterator<Integer> iterator=
-//                    mapReduce.reduce();
+                    mapReduce.reduce(key, map.get(key).iterator(), collector);
                 }
             }
             state=STATE_DONE;
