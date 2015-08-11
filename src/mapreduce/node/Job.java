@@ -59,7 +59,7 @@ public class Job extends Thread {
                 catch (Exception e){
                     e.printStackTrace();
                 }
-                collector.spill(jobname+"_shuffled_",2);
+                collector.spill("../tasks/"+jobname+"_shuffled_",2);
             }
             if (type==MapReduce.TYPE_REDUCER){
                 //todo traverse all mappers

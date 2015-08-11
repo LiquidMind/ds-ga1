@@ -3,17 +3,13 @@ package mapreduce.node;
 import mapreduce.dfs.DFSClient;
 import mapreduce.dfs.IncorrectLogFileException;
 import mapreduce.dfs.Logger;
-import mapreduce.dfs.UninitializedLoggerException;
 import mapreduce.utils.MapReduce;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.sql.SQLException;
 import java.util.HashMap;
 
 /**
