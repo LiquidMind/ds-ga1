@@ -91,10 +91,12 @@ public class DataNode extends UnicastRemoteObject implements DataNodeInterface, 
       localPort = Integer.parseInt(args[4]);
       
       // init security manager
+/*
       if (System.getSecurityManager() == null) {
         System.setSecurityManager(new SecurityManager());
       }
-      
+*/
+
       DataNodeInterface dataNode = new DataNode();
       //RemoteFile remoteFile = new RemoteFile();
       
@@ -155,7 +157,7 @@ public class DataNode extends UnicastRemoteObject implements DataNodeInterface, 
       stmt.close();
       
       /*
-      byte[] test = "Однажды в студеную зимнюю пору я из лесу вышел, был сильный мороз!".getBytes();
+      byte[] test = "пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅ пїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ!".getBytes();
       dataNode.saveChunk(test);
       byte[] chunk = dataNode.getChunk(Arrays.hashCode(test));
       log(0, "byte[] chunk: " + new String(chunk) + "\n");

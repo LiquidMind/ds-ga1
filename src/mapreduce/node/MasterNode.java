@@ -71,9 +71,9 @@ public class MasterNode {
       }
     
       // init security manager
-      if (System.getSecurityManager() == null) {
+      /*if (System.getSecurityManager() == null) {
         System.setSecurityManager(new SecurityManager());
-      }
+      }*/
   
       nameNodeHost = args[1];
       nameNodePort = Integer.parseInt(args[3]);

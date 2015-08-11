@@ -104,10 +104,12 @@ public class NameNode extends UnicastRemoteObject implements NameNodeInterface, 
       String localIP = InetAddress.getLocalHost().getHostAddress();
 
       // init security manager
+/*
       if (System.getSecurityManager() == null) {
         System.setSecurityManager(new SecurityManager());
       }
-      
+*/
+
       NameNode nameNode = new NameNode();
       RemoteFile remoteFile = new RemoteFile();
       
