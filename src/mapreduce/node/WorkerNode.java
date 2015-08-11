@@ -1,11 +1,19 @@
 package mapreduce.node;
 
+import mapreduce.dfs.DFSClient;
+import mapreduce.dfs.IncorrectLogFileException;
+import mapreduce.dfs.Logger;
+import mapreduce.dfs.UninitializedLoggerException;
 import mapreduce.utils.MapReduce;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
+import java.sql.SQLException;
 import java.util.HashMap;
 
 /**
@@ -26,16 +34,45 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
     }
 
     @Override
-    public void addJob(String jobName, byte type, String pathToJar, String className, String filename) throws RemoteException{
+    public void addJob(String jobName, byte type, String pathToJar, String className, String pathToData) throws RemoteException{
         SysLogger.getInstance().info("Job "+jobName+" started");
+        
+        Logger logger = null;
         try {
-            URL url = new URL("file:///"+pathToJar);
+          logger = new Logger(0, "..\\log\\WorkerNode.log");
+        } catch (IncorrectLogFileException e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+
+        DFSClient dfs = DFSClient.getInstance();
+        try {
+          dfs.init("localhost", 20000, logger);
+        } catch (Exception e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+        
+        String localPathToJar = "..\\tasks\\" + jobName + ".jar";
+        File jarFile = new File(localPathToJar);
+        String localPathToData = "..\\tasks\\" + jobName + ".dat";
+        File dataFile = new File(localPathToData);
+        try {
+          dfs.downloadFile(pathToJar, localPathToJar);
+          dfs.downloadFile(pathToData, localPathToData);
+        } catch (Exception e) {
+          // TODO Auto-generated catch block
+          e.printStackTrace();
+        }
+        
+        try {
+            URL url = new URL("file:///" + jarFile.getAbsolutePath());
             URLClassLoader classLoader=new URLClassLoader(new URL[]{url});
             //todo make this
             Class c=classLoader.loadClass(className);
 
             MapReduce jobObject=(MapReduce) c.newInstance();
-            Job job=new Job(jobName, type, jobObject, filename);
+            Job job=new Job(jobName, type, jobObject, dataFile.getAbsolutePath());
             jobList.put(jobName,job);
 
             job.start(); //start new thread

@@ -14,7 +14,7 @@ public class WorkerStarter {
             WorkerNode node;
             node=new WorkerNode(port, "mpnode");
             node.startRMI();
-            node.addJob("qwe", MapReduce.TYPE_MAPPER, "example1.jar", "TestMapReduce", "nycrime2014.csv");
+            node.addJob("qwe", MapReduce.TYPE_MAPPER, "\\tasks\\example1.jar", "TestMapReduce", "\\tasks\\nycrime2014.csv");
 //            node.addJob("qwe", MapReduce.TYPE_REDUCER, "example1.jar", "TestMapReduce");
         }
         catch (Exception e){
