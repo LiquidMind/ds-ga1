@@ -1,5 +1,7 @@
 package mapreduce.utils;
 
+import java.util.Iterator;
+
 /**
  * Created by Aidar on 09.08.2015.
  */
@@ -11,5 +13,5 @@ public interface MapReduce {
     public static final byte TYPE_REDUCER=1;
 
     public void map(String key, String value, OutputCollector collector);
-    public void reduce();
+    public void reduce(String key, Iterator values, OutputCollector collector);
 }

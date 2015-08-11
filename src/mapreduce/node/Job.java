@@ -5,6 +5,7 @@ import mapreduce.utils.OutputCollector;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.util.ListIterator;
 
 /**
  * Created by Aidar on 10.08.2015.
@@ -52,15 +53,25 @@ public class Job extends Thread {
                         // process the line.
                         mapReduce.map(filename,line,collector);
                     }
-                    OutputCollector<String, Integer> collector1=collector;
+//                    OutputCollector<String, Integer> collector1=collector;
                 }
                 catch (Exception e){
                     e.printStackTrace();
                 }
-//                collector.
+                collector.spill("test",2);
             }
             if (type==MapReduce.TYPE_REDUCER){
-                mapReduce.reduce();
+                //todo traverse all mappers
+                OutputCollector<String, Integer> collector=new OutputCollector<String, Integer>();
+                BufferedReader br = new BufferedReader(new FileReader(filename));
+                String line;
+                //todo assume here we load all keys
+                while ((line = br.readLine()) != null) {
+                    // process the line.
+                    mapReduce.map(filename,line,collector);
+//                    ListIterator<Integer> iterator=
+//                    mapReduce.reduce();
+                }
             }
             state=STATE_DONE;
         }

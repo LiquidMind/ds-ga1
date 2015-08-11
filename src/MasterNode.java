@@ -388,7 +388,7 @@ public class MasterNode {
                     // do nothing
                     break;
                   default:
-                    throw new UnknownJobStateException();  
+//                    throw new UnknownJobStateException();
                 }
                 it.remove(); // avoids a ConcurrentModificationException
               }

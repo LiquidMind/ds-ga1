@@ -1,6 +1,7 @@
 import mapreduce.utils.MapReduce;
 import mapreduce.utils.OutputCollector;
 
+import java.util.Iterator;
 import java.util.StringTokenizer;
 
 /**
@@ -21,7 +22,7 @@ public class TestMapReduce implements MapReduce {
     }
 
     @Override
-    public void reduce() {
+    public void reduce(String key, Iterator values, OutputCollector collector) {
         System.out.println("Test reduce works!");
     }
 
