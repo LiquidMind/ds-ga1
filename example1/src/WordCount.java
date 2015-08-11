@@ -7,7 +7,7 @@ import java.util.StringTokenizer;
 /**
  * Created by Aidar on 09.08.2015.
  */
-public class TestMapReduce implements MapReduce {
+public class WordCount implements MapReduce {
     @Override
     public void map(String key, String value, OutputCollector collector) {
 //        System.out.println("Test map works!");
