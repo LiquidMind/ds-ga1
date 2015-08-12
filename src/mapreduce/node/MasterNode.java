@@ -369,7 +369,7 @@ public class MasterNode {
                 j = unassignedMappers.poll();
                 try {
                   // TODO:
-                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, j);
+                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, j, null,0);
                   workingMappers.put(j, i); // add map task to the list of working mappers
                 } catch (Exception e) {
                   log(0, "Exception while executing mapper job no. " + j);
