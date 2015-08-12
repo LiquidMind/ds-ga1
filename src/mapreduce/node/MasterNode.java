@@ -48,7 +48,7 @@ public class MasterNode {
   private static String currentFolder = "\\";
   
   static String workerNodesFileName;
-  static HashSet<String> workerNodesAddresses = new HashSet<String>();;
+  static HashSet<String> workerNodesAddresses = new HashSet<String>();
   static WorkerNodeInterface[] workerNodes = null;
   
   static String nameNodeHost;
@@ -279,10 +279,13 @@ public class MasterNode {
             String pathToData = normalizePath(splitArray[6]);
             String pathToResult = normalizePath(splitArray[7]);
             
+            ArrayList<String> peers = new ArrayList<String>(workerNodesAddresses);
+            
             boolean jobNotFinished = true;
             
             int i = 0;
-            String j = null;
+            String jm = null;
+            int jr = 0;
             int k = 0;
             
             // HashMap<mapperId: path to data, nodeId: from 0 to workerNodes.length>
@@ -355,55 +358,126 @@ public class MasterNode {
             }
             */
             
-            // while we have incomplete map tasks
-            while (finishedMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
+            // while we have incomplete reduce tasks
+            while ((unassignedReducers.size() > 0 || workingReducers.size() > 0) && failedWorkers.size() < workerNodes.length) {
               log(0, "i: " + i + ", m: " + mCount + ", r: " + rCount + ", w: " + workingMappers.size() + ", f: " + finishedMappers.size() + ", u: " + unassignedMappers.size() + ", f: " + failedWorkers.size() + "\n");
               
-              if (failedWorkers.contains(i)) {
-                // if current worker failed move to next
-                i = (i + 1) % workerNodes.length;
-                continue;
+              // while we have incomplete map tasks
+              while ((unassignedMappers.size() > 0 || workingMappers.size() > 0) && failedWorkers.size() < workerNodes.length) {
+                log(0, "i: " + i + ", m: " + mCount + ", r: " + rCount + ", wm: " + workingMappers.size() + ", fm: " + finishedMappers.size() + ", um: " + unassignedMappers.size() + ", fw: " + failedWorkers.size() + "\n");
+                
+                // while we have unassigned map tasks and number of assigned tasks leess than mCount
+                while (unassignedMappers.size() > 0 && workingMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
+                  if (failedWorkers.contains(i)) {
+                    // if current worker failed move to next
+                    i = (i + 1) % workerNodes.length;
+                    continue;
+                  }
+                  
+                  jm = unassignedMappers.poll();
+                  try {
+                    // TODO:
+                    workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, jm, null, 0);
+                    workingMappers.put(jm, i); // add map task to the list of working mappers
+                  } catch (Exception e) {
+                    log(0, "Exception while executing mapper job no. " + jm);
+                    e.printStackTrace();
+                    unassignedMappers.add(jm); // return map back to the list of unassigned map tasks
+                    failedWorkers.add(i); // add worker to the list of failed workers
+                  }
+                  // move to next worker
+                  i = (i + 1) % workerNodes.length;
+                }
+                
+                // iterate through all tasks and get their status
+                Iterator<Entry<String, Integer>> it = workingMappers.entrySet().iterator();
+                while (it.hasNext()) {
+                  Map.Entry<String, Integer> pair = it.next();
+                  String taskId = pair.getKey();
+                  int workerId = pair.getValue();
+                  int jobState = workerNodes[workerId].getJobState(jobName);
+                  
+                  switch (jobState) {
+                    case Job.STATE_DONE:
+                      log(0, "Mapper task no. " + taskId + " has been finished\n");
+                      log(0, "Added it to the list of finished tasks\n");
+                      it.remove(); //workingMappers.remove(taskId);
+                      finishedMappers.put(taskId, workerId);
+                      break;
+                    case Job.STATE_INPROGRESS:
+                      // do nothing
+                      break;
+                    case Job.STATE_FAILED:
+                      log(0, "Mapper task no. " + taskId + " has failed on worker no. " + workerId + "\n");
+                      log(0, "Added it to the list of failed workers\n");
+                      it.remove(); //workingMappers.remove(taskId);
+                      unassignedMappers.add(taskId);
+                      failedWorkers.add(workerId);
+                      break;  
+                    case Job.STATE_STOPPED:
+                      // do nothing
+                      break;
+                    default:
+                      throw new UnknownJobStateException();
+                  }
+                  //it.remove(); // avoids a ConcurrentModificationException
+                }
+                
+                Thread.sleep(jobTrackerTimeout);
               }
-              // while we have unassigned map tasks and number of assigned tasks leess than mCount
-              while (unassignedMappers.size() > 0 && workingMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
-                j = unassignedMappers.poll();
+              log(0, "All mapper tasks have been finished\n");
+              
+              // while we have unassigned reducers tasks and number of assigned tasks less than rCount
+              // all map tasks should be finished before running this
+              while (unassignedMappers.size() == 0 
+                      && workingMappers.size() == 0 
+                      && unassignedReducers.size() > 0 
+                      && workingReducers.size() < rCount 
+                      && failedWorkers.size() < workerNodes.length) {
+                if (failedWorkers.contains(i)) {
+                  // if current worker failed move to next
+                  i = (i + 1) % workerNodes.length;
+                  continue;
+                }
+                
+                jr = unassignedReducers.poll();
                 try {
                   // TODO:
-                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, j);
-                  workingMappers.put(j, i); // add map task to the list of working mappers
+                  workerNodes[i].addJob(jobName, MapReduce.TYPE_REDUCER, pathToJar, className, null, peers, jr);
+                  workingReducers.put(jr, i); // add map task to the list of working mappers
                 } catch (Exception e) {
-                  log(0, "Exception while executing mapper job no. " + j);
+                  log(0, "Exception while executing reducer job no. " + jr);
                   e.printStackTrace();
-                  unassignedMappers.add(j); // return map back to the list of unassigned map tasks
+                  unassignedReducers.add(jr); // return map back to the list of unassigned map tasks
                   failedWorkers.add(i); // add worker to the list of failed workers
                 }
                 // move to next worker
                 i = (i + 1) % workerNodes.length;
               }
               
-              // iterate through all tasks and get their status
-              Iterator<Entry<String, Integer>> it = workingMappers.entrySet().iterator();
-              while (it.hasNext()) {
-                Map.Entry<String, Integer> pair = it.next();
-                String taskId = pair.getKey();
+              // iterate through all reduce tasks and get their status
+              Iterator<Entry<Integer, Integer>> itr = workingReducers.entrySet().iterator();
+              while (itr.hasNext()) {
+                Map.Entry<Integer, Integer> pair = itr.next();
+                Integer rTaskId = pair.getKey();
                 int workerId = pair.getValue();
                 int jobState = workerNodes[workerId].getJobState(jobName);
                 
                 switch (jobState) {
                   case Job.STATE_DONE:
-                    log(0, "Mapper task no. " + taskId + " has been finished\n");
+                    log(0, "Reducer task no. " + rTaskId + " has been finished\n");
                     log(0, "Added it to the list of finished tasks\n");
-                    workingMappers.remove(taskId);
-                    finishedMappers.put(taskId, workerId);
+                    itr.remove(); //workingReducers.remove(rTaskId);
+                    finishedReducers.put(rTaskId, workerId);
                     break;
                   case Job.STATE_INPROGRESS:
                     // do nothing
                     break;
                   case Job.STATE_FAILED:
-                    log(0, "Mapper task no. " + taskId + " has failed on worker no. " + workerId + "\n");
+                    log(0, "Reducer task no. " + rTaskId + " has failed on worker no. " + workerId + "\n");
                     log(0, "Added it to the list of failed workers\n");
-                    workingMappers.remove(taskId);
-                    unassignedMappers.add(taskId);
+                    itr.remove(); //workingMappers.remove(taskId);
+                    unassignedReducers.add(rTaskId);
                     failedWorkers.add(workerId);
                     break;  
                   case Job.STATE_STOPPED:
@@ -412,18 +486,14 @@ public class MasterNode {
                   default:
                     throw new UnknownJobStateException();
                 }
-                it.remove(); // avoids a ConcurrentModificationException
+                //it.remove(); // avoids a ConcurrentModificationException
               }
               
               Thread.sleep(jobTrackerTimeout);
             }
             
             if (k == workerNodes.length) {
-              log(0, "There are no available worker nodes to add map jobs");
-            }
-            
-            if (k == workerNodes.length) {
-              log(0, "There are no available worker nodes to add reduce jobs");
+              log(0, "There are no available worker nodes to add reduce job");
             }
             
             while (jobNotFinished) {
