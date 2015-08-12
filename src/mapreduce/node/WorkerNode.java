@@ -53,10 +53,18 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
         
         String localPathToJar = "..\\tasks\\" + jobName + ".jar";
         File jarFile = new File(localPathToJar);
+        if (jarFile.exists()) {
+          jarFile.delete();
+        }
         String localPathToData = "..\\tasks\\" + jobName + ".dat";
         File dataFile = new File(localPathToData);
+        if (dataFile.exists()) {
+          dataFile.delete();
+        }
         try {
+          
           dfs.downloadFile(pathToJar, localPathToJar);
+          dfs.deleteFile(localPathToData);
           dfs.downloadFile(pathToData, localPathToData);
         } catch (Exception e) {
           // TODO Auto-generated catch block

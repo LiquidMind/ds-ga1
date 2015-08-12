@@ -7,6 +7,7 @@ import mapreduce.utils.ReducerCollector;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.net.URL;
+import java.rmi.Naming;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
@@ -91,10 +92,11 @@ public class Job extends Thread {
                     //get relative treemap from each mapper
 
                     //connect to peer
-                    URL host=new URL("http://"+peerAddress);
-                    int peerPort=host.getPort()==-1 ? 21001 : host.getPort();
+                    String[] parts = peerAddress.split(":");
+                    String peerHost = parts[1];
+                    int peerPort = Integer.parseInt(parts[2]);
 
-                    Registry registry = LocateRegistry.getRegistry(host.getHost(), peerPort);
+                    Registry registry = LocateRegistry.getRegistry(peerHost, peerPort);
                     WorkerNodeInterface peer = (WorkerNodeInterface) registry.lookup("mpnode");
 
                     //todo fix 1 to a logical number

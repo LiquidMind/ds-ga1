@@ -21,8 +21,8 @@ public class WorkerStarter {
             ArrayList<String> peers=new ArrayList<String>();
             peers.add("localhost:21001");
 
-            node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 0);
-            node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 1);
+            //node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 0);
+            //node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 1);
         }
         catch (Exception e){
             SysLogger.getInstance().warning("Can not start a worker");
