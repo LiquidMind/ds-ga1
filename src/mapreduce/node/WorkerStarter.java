@@ -18,8 +18,8 @@ public class WorkerStarter {
             node.startRMI();
 //            node.addJob("wordcount", MapReduce.TYPE_MAPPER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\nycrime2014.csv");
 //            node.addJob("wordcount", MapReduce.TYPE_MAPPER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\word_count_small.txt", null);
-            ArrayList<String> peers=new ArrayList<String>();
-            peers.add("localhost:21001");
+            //ArrayList<String> peers=new ArrayList<String>();
+            //peers.add("localhost:21001");
 
             //node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 0);
             //node.addJob("wordcount", MapReduce.TYPE_REDUCER, "\\tasks\\example1.jar", "WordCount", "\\tasks\\wordcount_shuffled_0", peers, 1);

@@ -14,6 +14,7 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.sql.SQLException;
+import java.util.AbstractCollection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -23,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Scanner;
+import java.util.UUID;
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.regex.Pattern;
 
@@ -266,6 +268,12 @@ public class MasterNode {
             } else {
               log(0, "Init was not performed\n");
             }
+        } else if (msg.equals("test")) {
+          String reg = "[^a-zA-Z']+";
+          String str = "One, two, three, four, five, s'ix, seven, eight, nine, ten!";
+          String[] res = str.split(reg);
+          log(0, "res.length: " + res.length + "\n");
+          log(0, Arrays.deepToString(res) + "\n");
         } else if (msg.equals("mapreduce")) {
           // run mapreduce tasks on available workers
           if (splitArray.length < 8 || splitArray.length > 8) {
@@ -277,9 +285,10 @@ public class MasterNode {
             String pathToJar = normalizePath(splitArray[4]);
             String className = splitArray[5];
             String pathToData = normalizePath(splitArray[6]);
-            String pathToResult = normalizePath(splitArray[7]);
+            String pathToResults = normalizePath(splitArray[7]);
             
-            ArrayList<String> peers = new ArrayList<String>(workerNodesAddresses);
+            String[] peers = new String[workerNodesAddresses.size()];
+            workerNodesAddresses.toArray(peers);
             
             boolean jobNotFinished = true;
             
@@ -297,14 +306,18 @@ public class MasterNode {
             }
             */
             HashMap<String, Integer> finishedMappers = new HashMap<String, Integer>();
+            // HashMap<UUID of the task, path to data>
+            HashMap<String, String> mapperTasks = new HashMap<String, String>();
             
             // HashMap<reducerId: from 0 to rCount, nodeId: from 0 to workerNodes.length>
-            HashMap<Integer, Integer> workingReducers = new HashMap<Integer, Integer>();
+            HashMap<String, Integer> workingReducers = new HashMap<String, Integer>();
             LinkedTransferQueue<Integer> unassignedReducers = new LinkedTransferQueue<Integer>();
             for (i = 0; i < rCount; i++) {
               unassignedReducers.add(i);
             }
-            HashMap<Integer, Integer> finishedReducers = new HashMap<Integer, Integer>();
+            HashMap<String, Integer> finishedReducers = new HashMap<String, Integer>();
+            // HashMap<UUID of the task, reducerId: from 0 to rCount>
+            HashMap<String, Integer> reducerTasks = new HashMap<String, Integer>();
             
             HashSet<Integer> failedWorkers = new HashSet<Integer>();
             
@@ -360,11 +373,11 @@ public class MasterNode {
             
             // while we have incomplete reduce tasks
             while ((unassignedReducers.size() > 0 || workingReducers.size() > 0) && failedWorkers.size() < workerNodes.length) {
-              log(0, "i: " + i + ", m: " + mCount + ", r: " + rCount + ", w: " + workingMappers.size() + ", f: " + finishedMappers.size() + ", u: " + unassignedMappers.size() + ", f: " + failedWorkers.size() + "\n");
+              log(0, "tw: " + workerNodes.length + ", i: " + i + ", m: " + mCount + ", r: " + rCount + ", wr: " + workingReducers.size() + ", fr: " + finishedReducers.size() + ", ur: " + unassignedReducers.size() + ", fw: " + failedWorkers.size() + "\n");
               
               // while we have incomplete map tasks
               while ((unassignedMappers.size() > 0 || workingMappers.size() > 0) && failedWorkers.size() < workerNodes.length) {
-                log(0, "i: " + i + ", m: " + mCount + ", r: " + rCount + ", wm: " + workingMappers.size() + ", fm: " + finishedMappers.size() + ", um: " + unassignedMappers.size() + ", fw: " + failedWorkers.size() + "\n");
+                log(0, "tw: " + workerNodes.length + ", i: " + i + ", m: " + mCount + ", r: " + rCount + ", wm: " + workingMappers.size() + ", fm: " + finishedMappers.size() + ", um: " + unassignedMappers.size() + ", fw: " + failedWorkers.size() + "\n");
                 
                 // while we have unassigned map tasks and number of assigned tasks leess than mCount
                 while (unassignedMappers.size() > 0 && workingMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
@@ -377,10 +390,13 @@ public class MasterNode {
                   jm = unassignedMappers.poll();
                   try {
                     // TODO:
-                    workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, jm, null, 0);
-                    workingMappers.put(jm, i); // add map task to the list of working mappers
+                    String jobUUID = UUID.randomUUID().toString();
+                    workerNodes[i].addJob(jobUUID, MapReduce.TYPE_MAPPER, pathToJar, className, jm, null, 0, rCount, null);
+                    mapperTasks.put(jobUUID, jm);
+                    workingMappers.put(jobUUID, i); // add map task to the list of working mappers
+                    log(0, "Added map task " + jm + " to the worker no. " + i + "\n");
                   } catch (Exception e) {
-                    log(0, "Exception while executing mapper job no. " + jm);
+                    log(0, "Exception while executing mapper job no. " + jm + "\n");
                     e.printStackTrace();
                     unassignedMappers.add(jm); // return map back to the list of unassigned map tasks
                     failedWorkers.add(i); // add worker to the list of failed workers
@@ -390,28 +406,28 @@ public class MasterNode {
                 }
                 
                 // iterate through all tasks and get their status
-                Iterator<Entry<String, Integer>> it = workingMappers.entrySet().iterator();
-                while (it.hasNext()) {
-                  Map.Entry<String, Integer> pair = it.next();
-                  String taskId = pair.getKey();
+                Iterator<Entry<String, Integer>> itm = workingMappers.entrySet().iterator();
+                while (itm.hasNext()) {
+                  Map.Entry<String, Integer> pair = itm.next();
+                  String mTaskId = pair.getKey();
                   int workerId = pair.getValue();
-                  int jobState = workerNodes[workerId].getJobState(jobName);
+                  int jobState = workerNodes[workerId].getJobState(mTaskId);
                   
                   switch (jobState) {
                     case Job.STATE_DONE:
-                      log(0, "Mapper task no. " + taskId + " has been finished\n");
+                      log(0, "Mapper task no. " + mTaskId + " has been finished\n");
                       log(0, "Added it to the list of finished tasks\n");
-                      it.remove(); //workingMappers.remove(taskId);
-                      finishedMappers.put(taskId, workerId);
+                      itm.remove(); //workingMappers.remove(taskId);
+                      finishedMappers.put(mTaskId, workerId);
                       break;
                     case Job.STATE_INPROGRESS:
                       // do nothing
                       break;
                     case Job.STATE_FAILED:
-                      log(0, "Mapper task no. " + taskId + " has failed on worker no. " + workerId + "\n");
+                      log(0, "Mapper task no. " + mTaskId + " has failed on worker no. " + workerId + "\n");
                       log(0, "Added it to the list of failed workers\n");
-                      it.remove(); //workingMappers.remove(taskId);
-                      unassignedMappers.add(taskId);
+                      itm.remove(); //workingMappers.remove(mTaskId);
+                      unassignedMappers.add(mapperTasks.get(mTaskId));
                       failedWorkers.add(workerId);
                       break;  
                     case Job.STATE_STOPPED:
@@ -425,7 +441,9 @@ public class MasterNode {
                 
                 Thread.sleep(jobTrackerTimeout);
               }
-              log(0, "All mapper tasks have been finished\n");
+              if (failedWorkers.size() < workerNodes.length) {
+                log(0, "All map tasks are finished\n");
+              }
               
               // while we have unassigned reducers tasks and number of assigned tasks less than rCount
               // all map tasks should be finished before running this
@@ -443,10 +461,13 @@ public class MasterNode {
                 jr = unassignedReducers.poll();
                 try {
                   // TODO:
-                  workerNodes[i].addJob(jobName, MapReduce.TYPE_REDUCER, pathToJar, className, null, peers, jr);
-                  workingReducers.put(jr, i); // add map task to the list of working mappers
+                  String jobUUID = UUID.randomUUID().toString();
+                  workerNodes[i].addJob(jobUUID, MapReduce.TYPE_REDUCER, pathToJar, className, pathToResults, peers, jr, rCount, finishedMappers);
+                  reducerTasks.put(jobUUID, jr);
+                  workingReducers.put(jobUUID, i); // add map task to the list of working mappers
+                  log(0, "Added reduce task " + jr + " to the worker no. " + i + "\n");
                 } catch (Exception e) {
-                  log(0, "Exception while executing reducer job no. " + jr);
+                  log(0, "Exception while executing reducer job no. " + jr + "\n");
                   e.printStackTrace();
                   unassignedReducers.add(jr); // return map back to the list of unassigned map tasks
                   failedWorkers.add(i); // add worker to the list of failed workers
@@ -456,12 +477,12 @@ public class MasterNode {
               }
               
               // iterate through all reduce tasks and get their status
-              Iterator<Entry<Integer, Integer>> itr = workingReducers.entrySet().iterator();
+              Iterator<Entry<String, Integer>> itr = workingReducers.entrySet().iterator();
               while (itr.hasNext()) {
-                Map.Entry<Integer, Integer> pair = itr.next();
-                Integer rTaskId = pair.getKey();
+                Map.Entry<String, Integer> pair = itr.next();
+                String rTaskId = pair.getKey();
                 int workerId = pair.getValue();
-                int jobState = workerNodes[workerId].getJobState(jobName);
+                int jobState = workerNodes[workerId].getJobState(rTaskId);
                 
                 switch (jobState) {
                   case Job.STATE_DONE:
@@ -477,7 +498,7 @@ public class MasterNode {
                     log(0, "Reducer task no. " + rTaskId + " has failed on worker no. " + workerId + "\n");
                     log(0, "Added it to the list of failed workers\n");
                     itr.remove(); //workingMappers.remove(taskId);
-                    unassignedReducers.add(rTaskId);
+                    unassignedReducers.add(reducerTasks.get(rTaskId));
                     failedWorkers.add(workerId);
                     break;  
                   case Job.STATE_STOPPED:
@@ -492,8 +513,10 @@ public class MasterNode {
               Thread.sleep(jobTrackerTimeout);
             }
             
-            if (k == workerNodes.length) {
-              log(0, "There are no available worker nodes to add reduce job");
+            if (failedWorkers.size() == workerNodes.length) {
+              log(0, "Error: There are no available worker nodes to add jobs! Restart job completely!\n");
+            } else {
+              log(0, "All reduce tasks have been finished\n");
             }
             
             while (jobNotFinished) {

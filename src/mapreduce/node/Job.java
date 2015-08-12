@@ -1,10 +1,14 @@
 package mapreduce.node;
 
+import mapreduce.dfs.DFSClient;
+import mapreduce.dfs.IncorrectLogFileException;
+import mapreduce.dfs.Logger;
 import mapreduce.utils.MapReduce;
 import mapreduce.utils.OutputCollector;
 import mapreduce.utils.ReducerCollector;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.net.URL;
 import java.rmi.Naming;
@@ -12,7 +16,9 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.ListIterator;
+import java.util.Map.Entry;
 import java.util.TreeMap;
 
 /**
@@ -30,7 +36,9 @@ public class Job extends Thread {
     private byte type;
     private String filename;
     private MapReduce mapReduce;
-    private ArrayList<String> peerList;
+    private String[] peerList;
+    private int numberOfReducers;
+    private HashMap<String, Integer> finishedMappers;
 
     public Job(String jobname, byte type, MapReduce mapReduce, String filename) {
         super(jobname);
@@ -41,9 +49,12 @@ public class Job extends Thread {
         state=STATE_STOPPED;
         peerList=null;
         id=0;
+        // TODO:
+        this.numberOfReducers = 0;
+        this.finishedMappers = null;
     }
 
-    public Job(String jobname, byte type, MapReduce mapReduce, String filename, ArrayList<String> peerList, int id) {
+    public Job(String jobname, byte type, MapReduce mapReduce, String filename, String[] peerList, int id, int numberOfReducers, HashMap<String, Integer> finishedMappers) {
         super(jobname);
         this.jobname=jobname;
         this.type=type;
@@ -52,6 +63,8 @@ public class Job extends Thread {
         state=STATE_STOPPED;
         this.peerList=peerList;
         this.id=id;
+        this.numberOfReducers = numberOfReducers;
+        this.finishedMappers = finishedMappers;
     }
 
     public byte getJobState(){
@@ -80,19 +93,20 @@ public class Job extends Thread {
                 catch (Exception e){
                     e.printStackTrace();
                 }
-                collector.spill("../tasks/"+jobname+"_shuffled_",2);
+                collector.spill("../tasks/"+jobname+"_shuffled_", numberOfReducers);
             }
             if (type==MapReduce.TYPE_REDUCER){
                 //traverse all mappers
                 ReducerCollector<String, Integer> collector=new ReducerCollector<String, Integer>();
 
                 TreeMap<String, ArrayList<Integer>> map=new TreeMap<String, ArrayList<Integer>>();
-                //traverse each mapper
-                for (String peerAddress: peerList){
+                //traverse each finished mapper
+                for (String jobUUID: finishedMappers.keySet()){
+                  
                     //get relative treemap from each mapper
 
                     //connect to peer
-                    String[] parts = peerAddress.split(":");
+                    String[] parts = peerList[finishedMappers.get(jobUUID)].split(":");
                     String peerHost = parts[1];
                     int peerPort = Integer.parseInt(parts[2]);
 
@@ -100,7 +114,7 @@ public class Job extends Thread {
                     WorkerNodeInterface peer = (WorkerNodeInterface) registry.lookup("mpnode");
 
                     //todo fix 1 to a logical number
-                    TreeMap inputData=peer.getJobResults(jobname, id);
+                    TreeMap inputData=peer.getJobResults(jobUUID, id);
                     //join values by keys
                     for (Object key: inputData.keySet()){
                         if (map.containsKey(key)){
@@ -121,7 +135,33 @@ public class Job extends Thread {
                     }
                 }
 
-                collector.spill("../tasks/"+jobname+"_reduced_"+id);
+                String localPathToData = "..\\tasks\\" + jobname + "_reduced_" + id + ".dat";
+                String remotePathToData = filename + "\\reduced_" + id + ".dat";
+                collector.spill(localPathToData);
+                
+                Logger logger = null;
+                try {
+                  logger = new Logger(0, "..\\log\\Job.log");
+                } catch (IncorrectLogFileException e) {
+                  // TODO Auto-generated catch block
+                  e.printStackTrace();
+                }
+
+                DFSClient dfs = DFSClient.getInstance();
+                try {
+                  dfs.init("localhost", 20000, logger);
+                } catch (Exception e) {
+                  // TODO Auto-generated catch block
+                  e.printStackTrace();
+                }
+                
+                try {
+                  dfs.deleteFile(remotePathToData);
+                  dfs.uploadFile(localPathToData, remotePathToData);
+                } catch (Exception e) {
+                  // TODO Auto-generated catch block
+                  e.printStackTrace();
+                }
             }
             state=STATE_DONE;
         }

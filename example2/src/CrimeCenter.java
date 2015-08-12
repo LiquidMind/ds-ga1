@@ -37,20 +37,20 @@ public class CrimeCenter implements MapReduce {
     public void map(String key, String value, OutputCollector collector) {
         String line = value.toString();
         StringTokenizer tokenizer = new StringTokenizer(line, ",", false);
-
-        int i=1;
-        while (tokenizer.hasMoreTokens()) {
-            String token=tokenizer.nextToken();
-            String date="";
-            if (i==2){
-                date=token;
+        //System.out.println(line);
+        String token = null;
+        String month = null;
+        for (int i = 1; tokenizer.hasMoreTokens(); i++) {
+            token = tokenizer.nextToken();
+            if (i == 2){
+                month = token;
             }
 
-            if (i==11 && token=="Investigation complete"){
-                collector.collect(date, 1);
+            if (i == 11 && token.indexOf("Investigation complete") > -1){
+                //System.out.println("month: " + month);
+                collector.collect(month, 1);
                 return;
             }
-            i++;
         }
     }
 
@@ -69,6 +69,7 @@ public class CrimeCenter implements MapReduce {
 
     public void reduce(String key, Iterator values, ReducerCollector collector) {
         Integer sum=0;
+        
         while (values.hasNext()) {
             sum += (Integer) values.next();
         }

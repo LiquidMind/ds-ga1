@@ -32,7 +32,7 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
     }
 
     @Override
-    public void addJob(String jobName, byte type, String pathToJar, String className, String pathToData, ArrayList<String> peers, int parNumber) throws RemoteException{
+    public void addJob(String jobName, byte type, String pathToJar, String className, String pathToData, String[] peers, int parNumber, int numberOfReducers, HashMap<String, Integer> finishedMappers) throws RemoteException{
         SysLogger.getInstance().info("Job "+jobName+" started");
         
         Logger logger = null;
@@ -62,10 +62,10 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
           dataFile.delete();
         }
         try {
-          
           dfs.downloadFile(pathToJar, localPathToJar);
-          dfs.deleteFile(localPathToData);
-          dfs.downloadFile(pathToData, localPathToData);
+          if (type == MapReduce.TYPE_MAPPER) {
+            dfs.downloadFile(pathToData, localPathToData);
+          }
         } catch (Exception e) {
           // TODO Auto-generated catch block
           e.printStackTrace();
@@ -78,7 +78,12 @@ public class WorkerNode extends RMIServer implements WorkerNodeInterface {
             Class c=classLoader.loadClass(className);
 
             MapReduce jobObject=(MapReduce) c.newInstance();
-            Job job=new Job(jobName, type, jobObject, dataFile.getAbsolutePath(),peers,parNumber);
+            Job job = null;
+            if (type == MapReduce.TYPE_MAPPER) {
+              job=new Job(jobName, type, jobObject, dataFile.getAbsolutePath(),peers,parNumber, numberOfReducers, finishedMappers);
+            } else if (type == MapReduce.TYPE_REDUCER) {
+              job=new Job(jobName, type, jobObject, pathToData,peers,parNumber, numberOfReducers, finishedMappers);
+            }
             jobList.put(jobName,job);
 
             job.start(); //start new thread

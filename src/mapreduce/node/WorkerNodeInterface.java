@@ -3,6 +3,7 @@ package mapreduce.node;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.TreeMap;
 
 /**
@@ -18,7 +19,7 @@ public interface WorkerNodeInterface extends Remote {
      * @param filename
      * @throws RemoteException
      */
-    public void addJob(String jobName, byte type, String pathToJar, String className, String filename, ArrayList<String> peers, int partNumber) throws RemoteException;
+    public void addJob(String jobName, byte type, String pathToJar, String className, String filename, String[] peers, int partNumber, int numberOfReducers, HashMap<String, Integer> finishedMappers) throws RemoteException;
 
     /**
      * Get job state

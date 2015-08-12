@@ -130,6 +130,9 @@ public class DFSClient {
   }
   
   public void deleteFile(String path) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
+    if (path == null || path.equals("")) {
+      throw new RuntimeException("path in deleteFile function is null or empty");
+    }
     RemoteFileInterface file = nameNode.getFile(path);
     if (!file.exists()) {
       log(0, "File \"" + file.remoteToString() + "\" doesn't exist\n");
@@ -146,6 +149,10 @@ public class DFSClient {
   
   public void uploadFile(String local, String remote) throws RemoteException, IOException, UninitializedLoggerException, SQLException {
     RemoteFileInterface remoteFI = nameNode.getFile(remote);
+    
+    if (remote == null || remote.equals("")) {
+      throw new RuntimeException("remote in uploadFile function is null or empty");
+    }
     
     boolean error = false;
     if (remoteFI.exists()) {
