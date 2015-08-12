@@ -443,8 +443,13 @@ public class MasterNode {
                 jr = unassignedReducers.poll();
                 try {
                   // TODO:
+<<<<<<< HEAD
                   workerNodes[i].addJob(jobName, MapReduce.TYPE_REDUCER, pathToJar, className, null, peers, jr);
                   workingReducers.put(jr, i); // add map task to the list of working mappers
+=======
+                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, j, null,0);
+                  workingMappers.put(j, i); // add map task to the list of working mappers
+>>>>>>> origin/master
                 } catch (Exception e) {
                   log(0, "Exception while executing reducer job no. " + jr);
                   e.printStackTrace();

@@ -1,5 +1,6 @@
 import mapreduce.utils.MapReduce;
 import mapreduce.utils.OutputCollector;
+import mapreduce.utils.ReducerCollector;
 
 import java.nio.DoubleBuffer;
 import java.util.Iterator;
@@ -11,7 +12,7 @@ import java.util.StringTokenizer;
  */
 public class CrimeCenter implements MapReduce {
     @Override
-    public void map(String key, String value, OutputCollector collector) {
+   /* public void map(String key, String value, OutputCollector collector) {
         String line = value.toString();
         StringTokenizer tokenizer = new StringTokenizer(line, ",", false);
 
@@ -31,14 +32,47 @@ public class CrimeCenter implements MapReduce {
             }
             i++;
         }
+    }*/
+
+    public void map(String key, String value, OutputCollector collector) {
+        String line = value.toString();
+        StringTokenizer tokenizer = new StringTokenizer(line, ",", false);
+
+        int i=1;
+        while (tokenizer.hasMoreTokens()) {
+            String token=tokenizer.nextToken();
+            String date="";
+            if (i==2){
+                date=token;
+            }
+
+            if (i==11 && token=="Investigation complete"){
+                collector.collect(date, 1);
+                return;
+            }
+            i++;
+        }
     }
 
     @Override
-    public void reduce(String key, Iterator values, OutputCollector collector) {
+    /*public void reduce(String key, Iterator values, ReducerCollector collector) {
+        Double sum=0.0;
+        double count=0.0;
+        while (values.hasNext()) {
+            sum += (Double) values.next();
+            count++;
+        }
+        if (count>0) {
+            collector.collect(key, sum/count);
+        }
+    }*/
+
+    public void reduce(String key, Iterator values, ReducerCollector collector) {
         Integer sum=0;
         while (values.hasNext()) {
             sum += (Integer) values.next();
         }
+
         collector.collect(key, sum);
     }
 }
