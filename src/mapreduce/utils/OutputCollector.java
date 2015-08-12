@@ -11,7 +11,7 @@ import java.util.*;
  * Created by Aidar on 10.08.2015.
  */
 public class OutputCollector<KEYTYPE, VALTYPE> {
-    private Map<KEYTYPE, ArrayList<VALTYPE>> map;
+    protected Map<KEYTYPE, ArrayList<VALTYPE>> map;
 
     public OutputCollector() {
         this.map = new TreeMap<KEYTYPE, ArrayList<VALTYPE>>();

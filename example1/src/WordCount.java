@@ -1,5 +1,6 @@
 import mapreduce.utils.MapReduce;
 import mapreduce.utils.OutputCollector;
+import mapreduce.utils.ReducerCollector;
 
 import java.util.Iterator;
 import java.util.StringTokenizer;
@@ -22,7 +23,7 @@ public class WordCount implements MapReduce {
     }
 
     @Override
-    public void reduce(String key, Iterator values, OutputCollector collector) {
+    public void reduce(String key, Iterator values, ReducerCollector collector) {
         System.out.println("Test reduce works!");
         Integer sum=0;
         while (values.hasNext()) {

@@ -13,5 +13,5 @@ public interface MapReduce {
     public static final byte TYPE_REDUCER=1;
 
     public void map(String key, String value, OutputCollector collector);
-    public void reduce(String key, Iterator values, OutputCollector collector);
+    public void reduce(String key, Iterator values, ReducerCollector collector);
 }
