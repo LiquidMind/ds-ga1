@@ -56,7 +56,9 @@ public class MasterNode {
   
   static DFSClient dfs = DFSClient.getInstance();
   
-  public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException {
+  static int jobTrackerTimeout = 1000; // milliseconds  
+  
+  public static void main(String[] args) throws UninitializedLoggerException, IOException, SQLException, UnknownJobStateException, InterruptedException {
 
     try {
       // init everything to log messages
@@ -266,30 +268,32 @@ public class MasterNode {
             }
         } else if (msg.equals("mapreduce")) {
           // run mapreduce tasks on available workers
-          if (splitArray.length < 7 || splitArray.length > 7) {
+          if (splitArray.length < 8 || splitArray.length > 8) {
             log(0, "Use: mapreduce <job name> <mappers count> <reducers count> <jar with task> <class name> <data directory> <output file>\n");
           } else {
-            String jobName = splitArray[0];
-            int mCount = Integer.parseInt(splitArray[1]);
-            int rCount = Integer.parseInt(splitArray[2]);
-            String pathToJar = normalizePath(splitArray[3]);
-            String className = splitArray[4];
-            String pathToData = normalizePath(splitArray[5]);
-            String pathToResult = normalizePath(splitArray[6]);
+            String jobName = splitArray[1];
+            int mCount = Integer.parseInt(splitArray[2]);
+            int rCount = Integer.parseInt(splitArray[3]);
+            String pathToJar = normalizePath(splitArray[4]);
+            String className = splitArray[5];
+            String pathToData = normalizePath(splitArray[6]);
+            String pathToResult = normalizePath(splitArray[7]);
             
             boolean jobNotFinished = true;
             
             int i = 0;
-            int j = 0;
+            String j = null;
             int k = 0;
             
-            // HashMap<mapperId: from 0 to mCount, nodeId: from 0 to workerNodes.length>
-            HashMap<Integer, Integer> workingMappers = new HashMap<Integer, Integer>();
-            LinkedTransferQueue<Integer> unassignedMappers = new LinkedTransferQueue<Integer>();
+            // HashMap<mapperId: path to data, nodeId: from 0 to workerNodes.length>
+            HashMap<String, Integer> workingMappers = new HashMap<String, Integer>();
+            LinkedTransferQueue<String> unassignedMappers = new LinkedTransferQueue<String>();
+            /*
             for (i = 0; i < mCount; i++) {
               unassignedMappers.add(i);
             }
-            HashMap<Integer, Integer> finishedMappers = new HashMap<Integer, Integer>();
+            */
+            HashMap<String, Integer> finishedMappers = new HashMap<String, Integer>();
             
             // HashMap<reducerId: from 0 to rCount, nodeId: from 0 to workerNodes.length>
             HashMap<Integer, Integer> workingReducers = new HashMap<Integer, Integer>();
@@ -300,6 +304,38 @@ public class MasterNode {
             HashMap<Integer, Integer> finishedReducers = new HashMap<Integer, Integer>();
             
             HashSet<Integer> failedWorkers = new HashSet<Integer>();
+            
+            RemoteFileInterface folder = null;
+            
+            // get content of the directory in parameter
+            String path = normalizePath(pathToData);
+            
+            folder = dfs.getFile(path);
+            if (!folder.exists()) {
+              log(0, "Directory \"" + folder.remoteToString() + "\" doesn't exist\n");
+              folder = null;
+            } else if (!folder.isDirectory()) {
+              log(0, "\"" + folder.remoteToString() + "\" is not a directory\n");
+              folder = null;
+            }
+            
+            if (folder != null) {
+              RemoteFileInterface[] listOfFiles = folder.listFiles();
+              String pattern = folder.remoteToString() + (folder.remoteToString().equals("\\") ? "" : "\\"); 
+              if (listOfFiles.length == 0) {
+                log(0, "Folder \"" + folder.remoteToString() + "\" is empty\n");
+              } else {
+                log(0, "Folder \"" + folder.remoteToString() + "\" contains:\n");
+                for (i = 0; i < listOfFiles.length; i++) {
+                  log(0, "  " + listOfFiles[i].remoteToString().replaceFirst(Pattern.quote(pattern), "") + "\n");
+                  if (listOfFiles[i].isFile()) {
+                    unassignedMappers.add(listOfFiles[i].remoteToString());
+                    log(0, "    " + listOfFiles[i].remoteToString() + " was added as map task\n");
+                  }
+                }
+              }
+            }
+            
             
             // worker node to start assigning tasks from
             i = randomWithRange(0, workerNodes.length - 1);
@@ -315,23 +351,25 @@ public class MasterNode {
                 j--;
                 k++;
               }
-              i = (i + 1) / workerNodes.length;
+              i = (i + 1) % workerNodes.length;
             }
             */
             
             // while we have incomplete map tasks
             while (finishedMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
+              log(0, "i: " + i + ", m: " + mCount + ", r: " + rCount + ", w: " + workingMappers.size() + ", f: " + finishedMappers.size() + ", u: " + unassignedMappers.size() + ", f: " + failedWorkers.size() + "\n");
+              
               if (failedWorkers.contains(i)) {
                 // if current worker failed move to next
-                i = (i + 1) / workerNodes.length;
+                i = (i + 1) % workerNodes.length;
                 continue;
               }
-              // while we have unassigned map tasks
-              while (unassignedMappers.size() > 0 && failedWorkers.size() < workerNodes.length) {
+              // while we have unassigned map tasks and number of assigned tasks leess than mCount
+              while (unassignedMappers.size() > 0 && workingMappers.size() < mCount && failedWorkers.size() < workerNodes.length) {
                 j = unassignedMappers.poll();
                 try {
                   // TODO:
-                  // workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, fileName);
+                  workerNodes[i].addJob(jobName, MapReduce.TYPE_MAPPER, pathToJar, className, j);
                   workingMappers.put(j, i); // add map task to the list of working mappers
                 } catch (Exception e) {
                   log(0, "Exception while executing mapper job no. " + j);
@@ -340,14 +378,14 @@ public class MasterNode {
                   failedWorkers.add(i); // add worker to the list of failed workers
                 }
                 // move to next worker
-                i = (i + 1) / workerNodes.length;
+                i = (i + 1) % workerNodes.length;
               }
               
               // iterate through all tasks and get their status
-              Iterator<Entry<Integer, Integer>> it = workingMappers.entrySet().iterator();
+              Iterator<Entry<String, Integer>> it = workingMappers.entrySet().iterator();
               while (it.hasNext()) {
-                Map.Entry<Integer, Integer> pair = it.next();
-                int taskId = pair.getKey();
+                Map.Entry<String, Integer> pair = it.next();
+                String taskId = pair.getKey();
                 int workerId = pair.getValue();
                 int jobState = workerNodes[workerId].getJobState(jobName);
                 
@@ -372,10 +410,12 @@ public class MasterNode {
                     // do nothing
                     break;
                   default:
-//                    throw new UnknownJobStateException();
+                    throw new UnknownJobStateException();
                 }
                 it.remove(); // avoids a ConcurrentModificationException
               }
+              
+              Thread.sleep(jobTrackerTimeout);
             }
             
             if (k == workerNodes.length) {

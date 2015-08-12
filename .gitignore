@@ -1,6 +1,7 @@
 /bin/
 /hdd/
 /log/
+/tasks/
 /*.iml
 /.idea
 /tasks
